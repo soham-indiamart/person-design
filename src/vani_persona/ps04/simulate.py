@@ -77,6 +77,8 @@ def run(key: str, spec: dict) -> dict:
         seller_wav, _ = sarvam.synthesize(line, lang, SELLER_VOICE, 1.05, 0.6, 16000)
         clips.append(seller_wav)
         r = s.seller_audio(seller_wav)
+        if r.get("wait"):  # scripted lines are complete; no one is going to carry on
+            r = s.flush()
         a = r.get("analysis") or {}
         lines.append(f"**Seller** (Saaras: {r.get('language')}): {r.get('transcript')}  \n"
                      f"<sub>Analyst: {a.get('state')} {a.get('intensity')} {a.get('trend')} ({a.get('source')}) · "
@@ -92,8 +94,8 @@ def run(key: str, spec: dict) -> dict:
                          f"{r['reply']}  <sub>{r['timings'].get('reply_total_ms')} ms</sub>")
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"{key}.wav").write_bytes(join_wavs(clips, gap_ms=400))
-    log = json.loads(s.save().read_text())
-    (OUT / f"{key}_switch_log.json").write_text(json.dumps(log, indent=2, ensure_ascii=False))
+    log = json.loads(s.save().read_text(encoding="utf-8"))
+    (OUT / f"{key}_switch_log.json").write_text(json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"key": key, "summary": spec["summary"], "lines": lines, "outcome": s.outcome,
             "n_switches": len(s.switch_log),
             "timeline": " → ".join(PERSONAS[t["persona"]].name for t in s.timeline)}
@@ -103,7 +105,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--sellers", nargs="+", default=list(SCENARIOS))
     args = ap.parse_args()
-    demo = json.loads((REPO_ROOT / "artifacts" / "ps04" / "demo_sellers.json").read_text())
+    demo = json.loads((REPO_ROOT / "artifacts" / "ps04" / "demo_sellers.json").read_text(encoding="utf-8"))
     md = ["# Voice demo (simulated seller voice, live bot)", "",
           "Seller lines are scripted and spoken by a Sarvam voice; every bot decision is made live from the audio.", ""]
     for key in args.sellers:
@@ -112,7 +114,7 @@ def main() -> None:
                f"outcome: {res['outcome'] or 'none'} · audio: `{key}.wav`", "",
                f"**Persona timeline:** {res['timeline']}", ""] + [x + "\n" for x in res["lines"]]
         print(f"{key}: {res['timeline']} | {res['n_switches']} switches, outcome {res['outcome']}")
-    (OUT / "README.md").write_text("\n".join(md))
+    (OUT / "README.md").write_text("\n".join(md), encoding="utf-8")
     print(f"-> {OUT}")
 
 

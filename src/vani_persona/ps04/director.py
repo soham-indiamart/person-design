@@ -6,7 +6,9 @@ Deterministic, so every switch can be explained in the log:
 - **Aggression** switches at >= 0.6, or on any aggression phrase (safety first).
 - **Weak signal** (0.5 to the threshold) must repeat on 2 consecutive seller turns, unless
   the analyst and the phrase lexicon agree on it (two independent detectors) -> switch now.
-- **Recovery**: 2 consecutive calm turns (trend calming or steady) -> back to Friendly Guide.
+- **Recovery**: 2 consecutive calm turns (trend calming or steady) -> back to the *home*
+  persona the live seller profile picks (Quick & Direct for an impatient seller, else
+  Friendly Guide). Between those two resting personas the profile switches at once.
 - **Anti ping-pong**: switching straight back to the persona left on the previous turn
   needs intensity >= 0.8.
 - **Escalation**: a 3rd consecutive aggressive turn while already de-escalating ->
@@ -56,7 +58,8 @@ class PersonaDirector:
         self.pending = None
         return d
 
-    def decide(self, v: Verdict) -> Decision:
+    def decide(self, v: Verdict, home: str = "normal", home_reason: str = "") -> Decision:
+        """``home``: the persona the live seller profile says to rest in while the seller is calm."""
         self.turns_since_switch += 1
         cur = self.current
         self.aggressive_streak = self.aggressive_streak + 1 if v.state == "aggressive" else 0
@@ -64,10 +67,15 @@ class PersonaDirector:
         if v.state == "calm":
             self.pending = None
             self.calm_streak = self.calm_streak + 1 if v.trend in ("calming", "steady") else 0
-            if cur != "normal" and self.calm_streak >= CALM_TURNS_TO_RECOVER:
+            if cur != home and cur in ("normal", "quick_direct"):
+                # Between the two resting personas the profile decides at once.
                 self.calm_streak = 0
-                return self._switch("normal", f"Seller calm for {CALM_TURNS_TO_RECOVER} turns ({v.trend}): "
-                                              f"back to {PERSONAS['normal'].name}.")
+                return self._switch(home, f"Live profile: {home_reason or 'seller profile changed'}; "
+                                          f"switch to {PERSONAS[home].name}.")
+            if cur != home and self.calm_streak >= CALM_TURNS_TO_RECOVER:
+                self.calm_streak = 0
+                return self._switch(home, f"Seller calm for {CALM_TURNS_TO_RECOVER} turns ({v.trend}): "
+                                          f"back to {PERSONAS[home].name}.")
             return Decision("stay", cur, cur, f"Seller calm ({v.trend}); keep {PERSONAS[cur].name}.")
         self.calm_streak = 0
 

@@ -208,7 +208,7 @@ def to_markdown(ev: dict) -> str:
 
 
 def load_evidence(path: Path = EVIDENCE_PATH) -> dict:
-    return json.loads(Path(path).read_text())
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def main() -> None:
@@ -217,9 +217,9 @@ def main() -> None:
     args = ap.parse_args()
     ev = build(args.root)
     EVIDENCE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    EVIDENCE_PATH.write_text(json.dumps(ev, indent=2, ensure_ascii=False))
+    EVIDENCE_PATH.write_text(json.dumps(ev, indent=2, ensure_ascii=False), encoding="utf-8")
     out = REPO_ROOT / "docs" / "findings" / "ps04_evidence.md"
-    out.write_text(to_markdown(ev))
+    out.write_text(to_markdown(ev), encoding="utf-8")
     print(f"wrote {EVIDENCE_PATH} and {out}")
 
 

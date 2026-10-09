@@ -59,13 +59,20 @@
   .bar > div { height:100%; background:#e8590c; }
   .pcat { display:grid; grid-template-columns: 12px 1fr; gap:4px 8px; font-size:12px; align-items:start; }
   .pcat i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-top:4px; }
+  .plabel { font-size:15px; font-weight:700; color:var(--ink); }
+  select { padding:6px; border:1px solid var(--line); border-radius:8px; font:inherit; }
+  .stages { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11.5px; }
+  .stage { border:1px solid var(--line); border-radius:10px; padding:1px 8px; color:var(--mute); }
+  .stage.done { background:#ecfdf3; color:#067647; border-color:#abefc6; }
+  .stage.now { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:600; }
+  .msg.pending { opacity:.6; border:1px dashed #12866b; }
   .tag.moderate { background:#ecfdf3; color:#067647; } .tag.weak { background:#fffaeb; color:#b54708; } .tag.informed_guess, .tag.inconclusive { background:#f2f4f7; color:#475467; }
 </style>
 </head>
 <body>
 <header>
   <h1>VANI · Seller-fit adaptive persona</h1>
-  <span class="sub">Saaras speech-to-text → Behaviour Analyst agent → Persona Director → Sarvam LLM → Bulbul voice</span>
+  <span class="sub">Saaras speech-to-text → turn-taking gate → Behaviour Analyst + live caller profile → Persona Director → call flow → Sarvam LLM → Bulbul voice (streamed)</span>
   <span class="sub" id="credits" style="margin-left:auto"></span>
 </header>
 <main>
@@ -91,10 +98,18 @@
   <section class="col">
     <div class="card" style="display:flex; flex-direction:column; flex:1; min-height:0">
       <h2>2 · Live call</h2>
+      <div class="controls" style="margin-bottom:6px">
+        <label class="reason">call type <select id="mode" onchange="modeChanged()">
+          <option value="seller">Seller outreach (VANI calls a seller)</option>
+          <option value="buyer">Buyer help desk (a buyer calls in)</option></select></label>
+        <input type="text" id="product" placeholder="product the buyer asks about (optional)" style="display:none">
+      </div>
       <div class="controls">
+        <label class="reason">start as <select id="startPersona"><option value="">Auto (from the data)</option></select></label>
         <button id="startBtn" onclick="startCall()" disabled>Start call</button>
         <button id="endBtn" class="sec" onclick="endCall()" disabled>End call</button>
         <label><input type="checkbox" id="handsfree" checked> hands-free</label>
+        <label class="reason" title="Speak over the agent to cut it off. Use headphones, or its own voice may trigger this."><input type="checkbox" id="bargein"> let me interrupt (headphones)</label>
         <button id="pttBtn" class="sec" disabled>Hold to talk</button>
         <div class="meter"><div id="level"></div></div>
         <span id="status">idle</span>
@@ -117,6 +132,14 @@
       <details style="margin-top:6px"><summary>delivery settings now</summary><div class="kv" id="settings"></div></details>
       <div class="reason" id="timings" style="margin-top:6px"></div>
     </div>
+    <div class="card">
+      <h2>Live caller persona (generated from the conversation)</h2>
+      <div id="profile" class="reason">Builds up from the caller's words, language and speaking speed after every turn.</div>
+    </div>
+    <div class="card">
+      <h2>Call flow <span class="reason" id="flowLabel"></span></h2>
+      <div id="flow" class="reason">The agent moves through these stages as the conversation allows, not in a fixed script.</div>
+    </div>
     <div class="card scroll" style="flex:1">
       <h2>Switch log <button class="sec" style="float:right;padding:3px 8px;font-size:11px" onclick="downloadLog()">download</button></h2>
       <table><thead><tr><th>#</th><th>Switch</th><th>Seller state · evidence</th><th>Reason · change</th></tr></thead><tbody id="log"></tbody></table>
@@ -128,11 +151,30 @@
 </main>
 
 <script>
-let SELLER = null, SESSION = null, BASE = null, CUR = null, busy = false, ended = false, PERSONAS = {};
+let SELLER = null, SESSION = null, BASE = null, CUR = null, busy = false, ended = false, PERSONAS = {}, LANGS = {}, PREV_PROFILE = null;
 let audioCtx, micStream, proc, speaking = false, vadOn = false, chunks = [], noise = 0.008, silentMs = 0, voicedMs = 0;
+let PENDING = false, idleMs = 0, PLAYER = null, CUR_AUDIO = null, INTERRUPTED = false, loudMs = 0;
 const SR_OUT = 16000;
+// Turn-taking: a person waits longer after a short burst ("umm...", "matlab") than after a full sentence.
+const PAUSE_SHORT_MS = 1000, PAUSE_MS = 750, SHORT_UTTERANCE_MS = 1200, MAX_UTTERANCE_MS = 25000;
+const FLUSH_AFTER_MS = 2500, NUDGE_AFTER_MS = 8000, BARGE_IN_MS = 300;
 
-async function api(path, opts) { const r = await fetch(path, opts); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; }
+async function api(path, opts) {
+  let r;
+  try {
+    r = await fetch(path, opts);
+  } catch (err) {
+    throw new Error('Connection failed: ' + err.message);
+  }
+  let j;
+  try {
+    j = await r.json();
+  } catch {
+    j = { error: r.statusText || ('HTTP ' + r.status) };
+  }
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
 function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function status(t, cls) { const s = document.getElementById('status'); s.textContent = t; s.className = cls || ''; }
 
@@ -146,9 +188,27 @@ async function loadSellers() {
       <div class="chips">${Object.entries(s.settings).map(([k,v]) => `<span class="chip">${k}: ${esc(v)}</span>`).join('')}</div></div>`).join('');
   if (j.credits) showCredits(j.credits);
   for (const p of j.personas) PERSONAS[p.id] = p;
+  LANGS = {...j.languages.speak_and_understand, ...j.languages.understand_only};
+  document.getElementById('startPersona').insertAdjacentHTML('beforeend', j.personas.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join(''));
   document.getElementById('pcat').innerHTML = j.personas.map(p => `<i style="background:${p.colour}"></i><div title="${esc(p.description)}"><b>${esc(p.name)}</b> <span class="tag">seller ${esc(p.state)}</span></div>`).join('');
   document.getElementById('langs').innerHTML = '<b>Spoken + understood:</b> ' + Object.values(j.languages.speak_and_understand).join(', ') +
     '<br><b>Understood (reply in Hindi/English):</b> ' + Object.values(j.languages.understand_only).join(', ');
+}
+function modeChanged() {
+  const buyer = document.getElementById('mode').value === 'buyer';
+  document.getElementById('product').style.display = buyer ? '' : 'none';
+  if (buyer) document.getElementById('startBtn').disabled = false;
+  else document.getElementById('startBtn').disabled = !SELLER;
+}
+function renderFlow(f) {
+  if (!f) return;
+  document.getElementById('flowLabel').textContent = '· ' + f.label;
+  const visited = new Set(f.visited || []);
+  const stages = f.stages.map((s, i) => `${i ? '<span>›</span>' : ''}<span class="stage ${s.id === f.stage ? 'now' : visited.has(s.id) ? 'done' : ''}">${esc(s.name)}</span>`).join('');
+  const notes = Object.entries(f.notes || {});
+  document.getElementById('flow').innerHTML = `<div class="stages">${stages}</div>` +
+    (notes.length ? `<div class="kv" style="margin-top:8px">${notes.map(([k, v]) => `<div class="k">${esc(k.replace(/_/g, ' '))}</div><div class="v">${esc(v)}</div>`).join('')}</div>`
+                  : `<div class="reason" style="margin-top:6px">Nothing captured yet.</div>`);
 }
 async function pick(k) {
   SELLER = k;
@@ -197,7 +257,8 @@ function addSwitches(list) {
   for (const e of list) {
     const ch = Object.entries(e.change).filter(([k]) => k !== 'focus').map(([k, v]) => `${k}: ${v[0]} → ${v[1]}`).join(', ') || '—';
     const what = e.type === 'persona' ? `<b style="color:${pcol(e.from_persona)}">${esc(e.from_name)}</b> → <b style="color:${pcol(e.to_persona)}">${esc(e.to_name)}</b>`
-               : e.type === 'language' ? `<b>language</b> ${esc((e.change.language || [])[0] || '')} → ${esc((e.change.language || [])[1] || 'Hindi (no voice)')}`
+               : e.type === 'language' ? `<b>language</b> ${esc(LANGS[(e.change.language || [])[0]] || (e.change.language || [])[0] || '')} → ${esc(LANGS[(e.change.language || [])[1]] || (e.change.language || [])[1] || 'Hindi (no voice)')}`
+               : e.type === 'profile' ? `<b>live profile</b>`
                : `<b>escalation</b>`;
     c.insertAdjacentHTML('beforeend', `<div class="sw">⚡ ${what}<br><span class="reason">${esc(e.reason)}</span></div>`);
     log.insertAdjacentHTML('beforeend', `<tr><td>${e.seller_turn}</td><td>${what}</td><td><b>${esc(e.signal)}</b> ${e.score != null ? esc(e.score) : ''} ${e.trend ? esc(e.trend) : ''}<br><span class="reason">${esc(e.detector)} · “${esc(e.evidence)}”</span></td><td class="reason">${esc(e.reason)}<br><i>${esc(ch)}</i></td></tr>`);
@@ -214,11 +275,94 @@ function renderPersona(p, timeline, flash) {
 }
 function renderAnalyst(a, d) {
   if (!a) return;
-  const col = {calm:'#2f6fed', aggressive:'#d92d20', rushed:'#b54708', confused:'#7a5af8', interested:'#12866b', suspicious:'#0e7090'}[a.state] || '#667085';
+  const p = Object.values(PERSONAS).find(x => x.state === a.state);
+  const col = p ? p.colour : '#667085';
   document.getElementById('analyst').innerHTML =
     `seller is <b style="color:${col}">${esc(a.state)}</b> · intensity ${a.intensity.toFixed(2)} · ${esc(a.trend)} · <i>${esc(a.source)}</i>
      <div class="bar"><div style="width:${a.intensity * 100}%;background:${col}"></div></div>
      ${a.evidence ? '“' + esc(a.evidence) + '” — ' : ''}${esc(a.rationale)}<br><b>Director:</b> ${esc(d ? d.action : '')} — ${esc(d ? d.reason : '')}`;
+}
+function renderProfile(p) {
+  if (!p) return;
+  const prev = PREV_PROFILE;
+  const chip = (label, key, val) => `<span class="chip ${prev && JSON.stringify(prev[key]) !== JSON.stringify(p[key]) ? 'changed' : ''}">${label}: ${esc(val)}</span>`;
+  document.getElementById('profile').innerHTML =
+    `<div class="plabel">${esc(p.label)}</div>
+     ${p.description ? `<div class="reason">“${esc(p.description)}”</div>` : ''}
+     <div class="chips">
+       ${chip('language', 'language', LANGS[p.language] || p.language)}
+       ${p.language === 'hi-IN' ? chip('mix', 'mix', p.mix.replace(/_/g, ' ')) : ''}
+       ${chip('wants pace', 'pace_wanted', p.pace_wanted)}
+       ${chip('patience', 'patience', p.patience)}
+       ${chip('register', 'formality', p.formality.replace(/_/g, ' '))}
+       ${p.speech_rate_wps != null ? chip('speaks', 'speech_rate_wps', p.speech_rate_wps + ' words/s') : ''}
+       ${p.avg_words != null ? chip('words/turn', 'avg_words', p.avg_words) : ''}
+       ${chip('pace adj.', 'pace_bias', ((p.pace_bias + p.rate_bias) >= 0 ? '+' : '') + (p.pace_bias + p.rate_bias).toFixed(2))}
+       ${chip('rests as', 'home_persona', pname(p.home_persona))}
+     </div>`;
+  PREV_PROFILE = p;
+}
+function makePlayer() {
+  const q = []; let playing = false, closed = false, resolveDone;
+  const done = new Promise(r => resolveDone = r);
+  async function run() {
+    if (playing || player.stopped) return;
+    playing = true; speaking = true; status('speaking', 'speaking');
+    while (q.length && !player.stopped) await play(q.shift(), true);
+    playing = false;
+    if (closed || player.stopped) { speaking = false; resolveDone(); }
+  }
+  const player = {
+    stopped: false,
+    add(b64) { if (!player.stopped) { q.push(b64); run(); } },
+    finish() { closed = true; if (!playing && !q.length) { speaking = false; resolveDone(); } return done; },
+    stop() {
+      player.stopped = true; q.length = 0; if (CUR_AUDIO) CUR_AUDIO.pause(); speaking = false; resolveDone();
+      if (player.reader) player.reader.cancel().catch(() => {});
+    },
+  };
+  return player;
+}
+function bargeIn() {
+  if (!PLAYER || PLAYER.stopped) return;
+  INTERRUPTED = true;
+  PLAYER.stop();
+  status('listening (you cut in)', 'listening');
+}
+async function streamApi(path, opts) {
+  let r;
+  try { r = await fetch(path, opts); } catch (err) { throw new Error('Connection failed: ' + err.message); }
+  if (!r.ok || !r.body) {
+    let j; try { j = await r.json(); } catch { j = { error: r.statusText || ('HTTP ' + r.status) }; }
+    throw new Error(j.error || ('HTTP ' + r.status));
+  }
+  const reader = r.body.getReader(), dec = new TextDecoder(), player = makePlayer();
+  PLAYER = player; player.reader = reader;
+  let buf = '', turn = null;
+  for (;;) {
+    if (player.stopped) break;
+    let value, done;
+    try { ({ value, done } = await reader.read()); } catch { break; }
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i); buf = buf.slice(i + 1);
+      if (!line.trim()) continue;
+      const m = JSON.parse(line);
+      if (m.type === 'turn') { turn = m; if (m.session) { SESSION = m.session; BASE = m.settings; } if (!m.skipped) handle(m); }
+      else if (m.type === 'audio') player.add(m.audio);
+      else if (m.type === 'error') addMsg('bot', '⚠ ' + m.error);
+      else if (m.type === 'done' && turn) {
+        Object.assign(turn.timings = turn.timings || {}, m.timings || {});
+        document.getElementById('timings').textContent = timingText(turn.timings);
+        if (m.credits) showCredits(m.credits);
+      }
+    }
+  }
+  await player.finish();
+  PLAYER = null;
+  return turn || {};
 }
 function showCredits(c) {
   const el = document.getElementById('credits');
@@ -227,18 +371,30 @@ function showCredits(c) {
 }
 function timingText(t) { if (!t) return ''; return Object.entries(t).filter(([k]) => k.endsWith('_ms')).map(([k, v]) => `${k.replace('_ms','')} ${v} ms`).join(' · '); }
 
-async function play(b64) {
+async function play(b64, keepSpeaking) {
   if (!b64) return;
   speaking = true; status('speaking', 'speaking');
   const a = new Audio('data:audio/wav;base64,' + b64);
-  await new Promise(res => { a.onended = res; a.onerror = res; a.play().catch(res); });
-  speaking = false;
+  CUR_AUDIO = a;
+  await new Promise(res => { a.onended = res; a.onerror = res; a.onpause = res; a.play().catch(res); });
+  CUR_AUDIO = null;
+  if (!keepSpeaking) speaking = false;
 }
 function handle(r) {
+  document.querySelectorAll('.msg.pending').forEach(e => e.remove());
+  PENDING = !!r.wait;
+  if (r.wait) {
+    addMsg('you pending', r.transcript, `… sounds unfinished (${r.wait_reason}) — waiting for you to carry on`);
+    status('listening (take your time)', 'listening');
+    return;
+  }
+  if (r.nudge) addMsg('you pending', '(silence)', 'no reply for a while');
   if (r.transcript !== undefined && r.transcript !== '') addMsg('you', r.transcript, `${r.language || ''}${r.language_probability ? ' p=' + r.language_probability.toFixed(2) : ''}${r.romanized && r.romanized !== r.transcript ? ' · ' + r.romanized : ''}`);
+  if (r.flow) renderFlow(r.flow);
   if (r.switches && r.switches.length) addSwitches(r.switches);
   if (r.persona) renderPersona(r.persona, r.timeline, (r.switches || []).some(e => e.type === 'persona'));
   if (r.analysis) renderAnalyst(r.analysis, r.decision);
+  if (r.profile) renderProfile(r.profile);
   const changed = new Set((r.switches || []).flatMap(e => Object.keys(e.change)));
   if (r.settings) renderSettings(r.settings, changed);
   if (r.reply) addMsg('bot', r.reply, `${r.settings ? r.settings.speaker + ' · pace ' + r.settings.pace + ' · ' + r.settings.language : ''}`);
@@ -249,43 +405,48 @@ function handle(r) {
 }
 
 async function startCall() {
-  if (!SELLER) return;
+  const mode = document.getElementById('mode').value;
+  if (!SELLER && mode !== 'buyer') return;
   document.getElementById('chat').innerHTML = ''; document.getElementById('log').innerHTML = '';
-  ended = false; busy = true; status('calling…', 'thinking');
+  ended = false; busy = true; PREV_PROFILE = null; PENDING = false; INTERRUPTED = false; status('calling…', 'thinking');
+  document.getElementById('analyst').textContent = 'waiting for the caller…';
   try {
     await ensureMic();
-    const r = await api('/api/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({seller: SELLER})});
-    SESSION = r.session; BASE = r.settings; renderSettings(r.settings);
-    document.getElementById('analyst').textContent = 'Starting persona from the seller file: ' + (r.start_reason || '');
-    handle(r);
     document.getElementById('endBtn').disabled = false; document.getElementById('pttBtn').disabled = false;
-    await play(r.audio);
+    const persona = document.getElementById('startPersona').value;
+    const product = document.getElementById('product').value.trim();
+    const r = await streamApi('/api/start', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                            body: JSON.stringify({seller: SELLER || 'unknown', persona, mode, product, stream: true})});
+    document.getElementById('analyst').textContent = 'Starting persona: ' + (r.start_reason || '');
   } catch (e) { status(e.message); busy = false; return; }
   busy = false; listen();
 }
-function endCall() { ended = true; vadOn = false; status('call ended'); document.getElementById('endBtn').disabled = true; }
-function listen() {
+function endCall() { ended = true; vadOn = false; if (PLAYER) PLAYER.stop(); status('call ended'); document.getElementById('endBtn').disabled = true; }
+function listen(keepIdle) {
   if (ended) { status('call ended'); vadOn = false; return; }
-  chunks = []; silentMs = 0; voicedMs = 0;
+  chunks = []; silentMs = 0; voicedMs = 0; loudMs = 0;
+  if (!keepIdle) idleMs = 0;
   vadOn = document.getElementById('handsfree').checked;
-  status(vadOn ? 'listening' : 'hold the button to talk', 'listening');
+  if (!PENDING) status(vadOn ? 'listening' : 'hold the button to talk', 'listening');
 }
-async function sendAudio(wav) {
-  busy = true; vadOn = false; status('thinking', 'thinking');
-  try {
-    const r = await api('/api/turn?session=' + SESSION, {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: wav});
-    if (r.skipped) { busy = false; return listen(); }
-    handle(r); await play(r.audio);
-  } catch (e) { addMsg('bot', '⚠ ' + e.message); }
+function turnUrl(extra) {
+  let u = '/api/turn?stream=1&session=' + SESSION + (extra || '');
+  if (INTERRUPTED) { u += '&interrupted=1'; INTERRUPTED = false; }
+  return u;
+}
+async function send(url, opts, label) {
+  busy = true; vadOn = false; status(label || 'thinking', 'thinking');
+  try { await streamApi(url, opts); }
+  catch (e) { addMsg('bot', '⚠ ' + e.message); PENDING = false; }
   busy = false; listen();
 }
+function sendAudio(wav) { return send(turnUrl(), {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: wav}); }
+function sendFlush() { PENDING = false; return send(turnUrl('&flush=1'), {method: 'POST'}); }
+function sendNudge() { return send(turnUrl('&nudge=1'), {method: 'POST'}, 'checking in'); }
 async function sendTyped() {
   const el = document.getElementById('typed'); const text = el.value.trim();
   if (!text || !SESSION || busy) return; el.value = '';
-  busy = true; vadOn = false; status('thinking', 'thinking');
-  try { const r = await api('/api/turn?session=' + SESSION, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})}); handle(r); await play(r.audio); }
-  catch (e) { addMsg('bot', '⚠ ' + e.message); }
-  busy = false; listen();
+  await send(turnUrl(), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})});
 }
 async function downloadLog() {
   if (!SESSION) return;
@@ -312,16 +473,35 @@ async function ensureMic() {
     const rms = Math.sqrt(s / x.length);
     document.getElementById('level').style.width = Math.min(100, rms * 900) + '%';
     if (ptt) { chunks.push(new Float32Array(x)); return; }
-    if (!vadOn || busy || speaking) return;
     const ms = 1000 * x.length / audioCtx.sampleRate;
     const thr = Math.max(0.012, noise * 3);
+    if (speaking) {
+      // Barge-in: sustained, clearly-louder-than-echo speech while the agent talks.
+      if (!document.getElementById('bargein').checked || ended) return;
+      loudMs = rms > Math.max(0.04, noise * 6) ? loudMs + ms : 0;
+      if (loudMs > BARGE_IN_MS) { loudMs = 0; bargeIn(); }
+      return;
+    }
+    if (busy || ended || !SESSION) return;
+    if (rms > thr) idleMs = 0;
+    else if (voicedMs === 0) {
+      idleMs += ms;
+      // The caller stopped after an unfinished thought: answer what they said so far.
+      if (PENDING && idleMs > FLUSH_AFTER_MS) { idleMs = 0; sendFlush(); return; }
+      // Long silence: check in, like a person would.
+      if (!PENDING && vadOn && idleMs > NUDGE_AFTER_MS) { idleMs = 0; sendNudge(); return; }
+    }
+    if (!vadOn) return;
     if (rms > thr) { voicedMs += ms; silentMs = 0; }
     else { if (voicedMs === 0) noise = 0.95 * noise + 0.05 * rms; silentMs += ms; }
     if (voicedMs > 0 || rms > thr) chunks.push(new Float32Array(x)); else { chunks = chunks.slice(-6); chunks.push(new Float32Array(x)); }
     const total = chunks.length * ms;
-    if ((voicedMs > 300 && silentMs > 800) || total > 14000) {
+    const pause = voicedMs < SHORT_UTTERANCE_MS ? PAUSE_SHORT_MS : PAUSE_MS;
+    if ((voicedMs > 300 && silentMs > pause) || total > MAX_UTTERANCE_MS) {
       const wav = toWav(chunks, audioCtx.sampleRate); vadOn = false;
-      if (voicedMs > 300) sendAudio(wav); else listen();
+      if (voicedMs > 300) sendAudio(wav); else listen(true);
+    } else if (voicedMs > 0 && voicedMs <= 300 && silentMs > 1500) {
+      listen(true);  // a click or cough, not speech
     }
   };
 }

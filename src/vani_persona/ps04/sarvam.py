@@ -74,12 +74,12 @@ class Budget:
 
     def _load(self) -> dict:
         if self.path.exists():
-            return json.loads(self.path.read_text())
+            return json.loads(self.path.read_text(encoding="utf-8"))
         return {"spent_estimate": 0.0, "by_api": {}, "calls": 0}
 
     def _save(self, d: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(d, indent=2))
+        self.path.write_text(json.dumps(d, indent=2), encoding="utf-8")
 
     def status(self) -> dict:
         d = self._load()
@@ -137,9 +137,9 @@ def api_key() -> str:
     if not key:
         env = REPO_ROOT / ".env"
         if env.exists():
-            for line in env.read_text().splitlines():
+            for line in env.read_text(encoding="utf-8").splitlines():
                 if line.startswith("SARVAM_API_KEY="):
-                    key = line.split("=", 1)[1].strip()
+                    key = line.split("=", 1)[1].strip().strip("'\"")
     if not key:
         raise SarvamError("SARVAM_API_KEY is not set (environment or .env)")
     return key

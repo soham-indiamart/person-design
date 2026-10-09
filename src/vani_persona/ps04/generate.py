@@ -84,7 +84,7 @@ def main() -> None:
             for k in KEY_SETTINGS:
                 setting_counts[k][v[k]] += 1
 
-    (OUT_DIR / "shared_policy.json").write_text(json.dumps(shared, indent=2, ensure_ascii=False))
+    (OUT_DIR / "shared_policy.json").write_text(json.dumps(shared, indent=2, ensure_ascii=False), encoding="utf-8")
     rng = random.Random(7)
     sample = rng.sample(vectors, min(len(vectors), 4000))
     diffs = [sum(a[k] != b[k] for k in KEY_SETTINGS) for a, b in zip(sample[::2], sample[1::2])]
@@ -109,7 +109,7 @@ def main() -> None:
              if s["language"]["primary"]["value"] == "en-IN" and s["overall_confidence"] != "low"]
     if south:
         demo["english_first"] = rng.choice(south)
-    (OUT_DIR / "demo_sellers.json").write_text(json.dumps(demo, indent=2, ensure_ascii=False, default=str))
+    (OUT_DIR / "demo_sellers.json").write_text(json.dumps(demo, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
     n = sum(types.values())
     lines = ["# PS04 persona generator report", "",
@@ -135,7 +135,7 @@ def main() -> None:
     lines += ["", "| Type | " + " | ".join(KEY_SETTINGS) + " |", "|---|" + "---|" * len(KEY_SETTINGS)]
     lines += [f"| {st} | " + " | ".join(str(p[k]) for k in KEY_SETTINGS) + " |" for st, p in sorted(proto.items())]
     out = REPO_ROOT / "docs" / "findings" / "ps04_generator_report.md"
-    out.write_text("\n".join(lines) + "\n")
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"{n:,} specs -> {OUT_DIR / 'persona_specs.jsonl.gz'}; demo sellers: {list(demo)}; report -> {out}")
 
 

@@ -182,6 +182,181 @@ def test_language_mirroring_is_independent_of_persona():
     assert (s.language, s.mix, s.warmth) == ("ta-IN", "native", "high")  # persona delivery untouched
 
 
+def test_pace_requests_and_script_detection():
+    from vani_persona.ps04.signals import pace_request, script_language
+
+    assert pace_request(["bhai itna dheere kyu bol rahe ho"])[0] == "faster"
+    assert pace_request(["इतना धीरे बोल रहे हो, समझ नहीं आ रहा"])[0] == "faster"
+    assert pace_request(["thoda dheere boliye please"])[0] == "slower"
+    assert pace_request(["haan ji bolo"])[0] is None
+    assert script_language("ইয়ার আবি বি ইতনা স্লো")[0] == "bn-IN"
+    assert script_language("haan ji bolo")[0] is None
+
+
+def test_language_switches_on_first_full_sentence():
+    tr = LanguageTracker("hi-IN")
+    d = tr.update(None, None, ["ইয়ার এত স্লো বললে চলবে না"], 5)  # Bengali script, no Saaras code (typed)
+    assert d and d.detail["to"] == "bn-IN"
+    tr2 = LanguageTracker("hi-IN")
+    d2 = tr2.update(None, None, ["Okay, tell me quickly what this is about"], 8, hint="en-IN")
+    assert d2 and d2.detail["to"] == "en-IN"                       # analyst read alone, full sentence
+    tr3 = LanguageTracker("hi-IN")
+    assert tr3.update("en-IN", 0.95, ["Okay, tell me what this meeting is"], 7) is not None  # sure Saaras
+
+
+def test_speed_complaint_is_rushed_not_confused(monkeypatch):
+    from vani_persona.ps04 import sarvam
+
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (_ for _ in ()).throw(sarvam.SarvamError("offline")))
+    v = analyse([("bot", "Namaste"), ("seller", "itna dheere bol rahe ho, samajh nahi aa raha")], "", "normal")
+    assert v.state == "rushed"
+
+
+def test_live_profile_pace_is_sticky_and_sets_home_persona():
+    from vani_persona.ps04.profile import LiveProfile, apply_profile
+
+    p = LiveProfile(language="hi-IN", mix="balanced", formality="respectful_casual")
+    assert p.home_persona == "normal"
+    ch = p.observe(words=6, audio_s=None, analyst={}, pace_request="faster", language="hi-IN", mix=None, seller_turn=1)
+    assert ch["pace_bias"] == [0.0, 0.12] and p.home_persona == "quick_direct"
+    for _ in range(3):  # the analyst repeating "faster" does not ratchet the pace
+        p.observe(words=6, audio_s=None, analyst={"pace": "faster"}, pace_request=None, language="hi-IN", mix=None,
+                  seller_turn=2)
+    assert p.pace_bias == 0.12
+    for pid in ("de_escalator", "patient_explainer", "normal"):   # persona switches never undo it
+        base, s = _settings(), _settings()
+        apply_persona(s, base, pid)
+        slow = s.pace
+        apply_profile(s, p)
+        assert s.pace == round(slow + 0.12, 2)
+    p.observe(words=2, audio_s=None, analyst={"patience": "low"}, pace_request=None, language="hi-IN", mix=None,
+              seller_turn=3)
+    p.observe(words=8, audio_s=None, analyst={"patience": "medium"}, pace_request=None, language="hi-IN", mix=None,
+              seller_turn=4)
+    assert p.patience == "low"                                   # one calmer read is not enough
+    p.observe(words=8, audio_s=None, analyst={"patience": "medium"}, pace_request=None, language="hi-IN", mix=None,
+              seller_turn=5)
+    assert p.patience == "medium"
+    fast = LiveProfile(language="hi-IN", mix="balanced", formality="formal")
+    fast.observe(words=12, audio_s=3.9, analyst={}, pace_request=None, language="hi-IN", mix=None, seller_turn=1)
+    assert fast.speech_rate_wps == 4.0 and fast.rate_bias > 0     # a fast talker gets a brisker voice
+
+
+def test_director_rests_in_profile_home_persona():
+    d = PersonaDirector("normal")
+    sw = d.decide(_v("calm", 0.3), home="quick_direct", home_reason="seller is impatient")
+    assert (sw.action, sw.to_persona) == ("switch", "quick_direct")
+    d2 = PersonaDirector("de_escalator")
+    d2.decide(_v("calm", 0.3, "calming"), home="quick_direct")
+    assert d2.decide(_v("calm", 0.3, "calming"), home="quick_direct").to_persona == "quick_direct"
+
+
+def test_session_switches_language_pace_and_persona_offline(monkeypatch, tmp_path):
+    import json as _json
+
+    from vani_persona.ps04 import live, sarvam
+    from vani_persona.ps04.live import CallSession
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    reads = iter([
+        {"state": "rushed", "intensity": 0.8, "trend": "escalating", "language": "hi-IN", "pace": "faster",
+         "patience": "low", "formality": "casual", "persona": "busy shop owner, impatient"},
+        {"state": "calm", "intensity": 0.4, "trend": "steady", "language": "en-IN", "pace": "same",
+         "patience": "low", "formality": "casual", "persona": "busy owner, now in English"},
+    ])
+
+    def fake_chat(messages, max_tokens=300, temperature=0.3, json_mode=False, **k):
+        if json_mode:
+            return _json.dumps(next(reads)), 5
+        return "Ji, ek chhoti meeting fix karni thi. Kab free hain?", 5
+
+    monkeypatch.setattr(sarvam, "chat", fake_chat)
+    spec = generate(row(), EVIDENCE)
+    s = CallSession(spec, start_persona="normal")
+    s.open(stream=True)
+    start_pace = s.settings.pace
+    r = s.seller_text("bhai itna dheere kyu bol rahe ho, jaldi bolo", stream=True)
+    assert r["persona"]["id"] == "quick_direct"
+    assert r["settings"]["pace"] > start_pace and r["profile"]["patience"] == "low"
+    assert {e["type"] for e in r["switches"]} >= {"persona", "profile"}
+    r = s.seller_text("Okay, tell me quickly what this meeting is about", stream=True)
+    assert r["settings"]["language"] == "en-IN"
+    assert any(e["type"] == "language" for e in r["switches"])
+    assert r["persona"]["id"] == "quick_direct"                  # calm, but the profile says impatient
+
+
+def test_looks_incomplete_waits_for_unfinished_thoughts():
+    from vani_persona.ps04.signals import looks_incomplete
+
+    assert looks_incomplete("main ye kehna chah raha tha ki")[0]
+    assert looks_incomplete("umm")[0]
+    assert looks_incomplete("dekhiye hum log...")[0]
+    assert looks_incomplete("मुझे ये चाहिए लेकिन")[0]
+    assert not looks_incomplete("haan ji")[0]
+    assert not looks_incomplete("kaun bol raha hai?")[0]
+    assert not looks_incomplete("abhi busy hoon, baad mein call karo")[0]
+
+
+def test_new_personas_have_states_and_buyer_behaviour():
+    for pid, state in [("gentle_nudger", "hesitant"), ("empathetic_listener", "complaining"),
+                       ("advisor", "inquisitive"), ("respectful_persuader", "uninterested")]:
+        assert PERSONAS[pid].seller_state == state
+    assert all(p.behaviour_for("buyer") for p in PERSONAS.values())
+    s, base = _settings(), _settings()
+    apply_persona(s, base, "advisor", "buyer")
+    assert s.focus == PERSONAS["advisor"].buyer_behaviour
+
+
+def test_analyst_reads_complaints_and_questions_offline(monkeypatch):
+    from vani_persona.ps04 import sarvam
+
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (_ for _ in ()).throw(sarvam.SarvamError("offline")))
+    assert analyse([("seller", "pichli baar koi enquiry nahi aayi, paisa barbaad hua")], "", "normal").state \
+        == "complaining"
+    assert analyse([("seller", "ye kaise kaam karta hai, kya fayda hoga?")], "", "normal").state == "inquisitive"
+
+
+def test_buyer_spec_and_flow_tags(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live, sarvam
+    from vani_persona.ps04.flows import buyer_spec, flow_for
+    from vani_persona.ps04.live import CallSession
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    spec = buyer_spec(generate(row(), EVIDENCE), "steel pipes")
+    assert spec["call_mode"] == "buyer" and flow_for(spec).mode == "buyer"
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (
+        "Ji, kitni quantity chahiye? ##STAGE: quantity## ##NOTE: product=steel pipes; city=Pune##", 5))
+    s = CallSession(spec, start_persona="normal")
+    r = s.open(stream=True)
+    assert "##" not in r["reply"] and "STAGE" not in r["reply"]
+    assert r["flow"]["stage"] == "quantity" and r["flow"]["notes"] == {"product": "steel pipes", "city": "Pune"}
+    assert "requirement" in r["flow"]["visited"] and "quantity" in r["flow"]["visited"]
+    assert "buyer" in s.system_prompt(s.settings, s.persona_id, False).lower()
+
+
+def test_session_waits_for_unfinished_turn_then_merges(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live, sarvam
+    from vani_persona.ps04.live import CallSession
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (_ for _ in ()).throw(sarvam.SarvamError("offline"))
+                        if k.get("json_mode") else ("Ji, samajh gayi. ##STAGE: discover##", 5))
+    s = CallSession(generate(row(), EVIDENCE), start_persona="normal")
+    s.open(stream=True)
+    r = s.seller_text("main ye kehna chah raha tha ki", stream=True, hold_if_unfinished=True)
+    assert r["wait"] and s.pending and not any(t.role == "seller" for t in s.turns)
+    r = s.seller_text("hum log steel pipes bechte hain", stream=True, hold_if_unfinished=True)
+    assert not r.get("wait") and r["transcript"] == "main ye kehna chah raha tha ki hum log steel pipes bechte hain"
+    assert sum(t.role == "seller" for t in s.turns) == 1 and r["flow"]["stage"] == "discover"
+    assert s.seller_text("umm", stream=True, hold_if_unfinished=True)["wait"]
+    r = s.flush(stream=True)                                     # the caller went quiet: answer anyway
+    assert r["transcript"] == "umm" and r["reply"]
+    s.mark_interrupted()
+    assert s.turns[-1].meta["interrupted"]
+    r = s.nudge(stream=True)
+    assert r["nudge"] == 1 and not r["ended"]
+
+
 def test_credit_cap_blocks_before_sending(tmp_path):
     import pytest
 

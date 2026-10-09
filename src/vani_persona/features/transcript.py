@@ -19,7 +19,7 @@ from vani_persona.canonical import Speaker, Turn
 from vani_persona.features import lexicons as lx
 from vani_persona.features.registry import FEATURES
 
-_PUNCT_RE = re.compile(r"[^\w\sऀ-ॿ?]", re.UNICODE)
+_PUNCT_RE = re.compile(r"[^\w\s\u0900-\u0DFF?]", re.UNICODE)  # keep combining marks of all Indic scripts
 _SPACE_RE = re.compile(r"\s+")
 _DEVANAGARI_RE = re.compile(r"[ऀ-ॿ]")
 _LATIN_RE = re.compile(r"[A-Za-z]")
