@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/switch_decision.schema.json",
+  "title": "Persona switch decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["turn_index", "seller_turn", "action", "from_persona", "to_persona", "phase", "reason", "challenger", "challenger_streak", "scores"],
+  "properties": {
+    "turn_index": {"type": "integer", "minimum": 0},
+    "seller_turn": {"type": "integer", "minimum": 0},
+    "action": {"enum": ["retain", "commit", "switch", "revert_to_neutral"]},
+    "from_persona": {"type": "string"},
+    "to_persona": {"type": "string"},
+    "phase": {"enum": ["NEUTRAL", "COMMITTED"]},
+    "reason": {"type": "string"},
+    "challenger": {"type": ["string", "null"]},
+    "challenger_streak": {"type": "integer", "minimum": 0},
+    "scores": {"type": "object", "additionalProperties": {"type": "number"}}
+  }
+}

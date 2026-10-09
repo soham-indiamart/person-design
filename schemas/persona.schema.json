@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/persona.schema.json",
+  "title": "VANI conversational persona",
+  "description": "A persona controls HOW VANI speaks. It never controls WHAT VANI may offer, claim or do: business policy, facts and compliance live in the policy layer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "persona_id", "version", "name", "status", "audience", "definition", "style", "matching", "switching", "evaluation"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "persona_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]{2,40}$"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "name": {"type": "string", "minLength": 3},
+    "status": {
+      "enum": ["hypothesis", "candidate", "validated_offline", "in_experiment", "approved", "retired"],
+      "description": "hypothesis = not yet backed by call data. Only 'approved' personas may serve production traffic outside an experiment."
+    },
+    "audience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["party", "call_objectives"],
+      "properties": {
+        "party": {"enum": ["seller"]},
+        "call_objectives": {"type": "array", "items": {"type": "string"}, "minItems": 1, "description": "'*' = any objective"},
+        "excluded_objectives": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["behavioural_summary", "distinctive_features", "evidence", "confidence", "limitations"],
+      "properties": {
+        "behavioural_summary": {"type": "string"},
+        "distinctive_features": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature", "direction"],
+            "properties": {
+              "feature": {"type": "string"},
+              "direction": {"enum": ["high", "low"]},
+              "z": {"type": ["number", "null"], "description": "Mean residualized z-score from the segmentation report; null for hypotheses"}
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source"],
+          "properties": {
+            "source": {"type": "string", "description": "Report + run identifier, or 'none (hypothesis)'"},
+            "segment_id": {"type": ["integer", "null"]},
+            "n_calls": {"type": ["integer", "null"], "minimum": 0},
+            "share": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+            "bootstrap_ari": {"type": ["number", "null"]},
+            "temporal_ari": {"type": ["number", "null"]},
+            "adjusted_outcome_rate": {"type": ["number", "null"]},
+            "human_review": {"type": ["string", "null"], "description": "Reviewer role + date + transcripts read"}
+          }
+        },
+        "confidence": {"enum": ["none", "low", "medium", "high"]},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tone", "pace", "language", "opening", "explanation", "turn_taking", "objection_handling", "re_engagement", "example_dialogue"],
+      "properties": {
+        "tone": {"enum": ["neutral_professional", "warm", "reassuring", "brisk_professional"]},
+        "pace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tts_rate", "pause_after_question_ms"],
+          "properties": {
+            "tts_rate": {"type": "number", "minimum": 0.8, "maximum": 1.2, "description": "Relative TTS speaking rate; tunable"},
+            "pause_after_question_ms": {"type": "integer", "minimum": 0, "maximum": 2000},
+            "endpointing_patience_ms": {"type": "integer", "minimum": 200, "maximum": 3000, "description": "Silence before VANI takes the turn; tunable"}
+          }
+        },
+        "language": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["policy"],
+          "properties": {
+            "policy": {"enum": ["mirror_seller", "campaign_default"]},
+            "register": {"enum": ["formal", "conversational"]}
+          }
+        },
+        "opening": {"type": "string", "description": "Opening strategy. Used ONLY before the first seller response; never replayed after a switch"},
+        "explanation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_sentences_per_turn", "density"],
+          "properties": {
+            "max_sentences_per_turn": {"type": "integer", "minimum": 1, "maximum": 6},
+            "density": {"enum": ["minimal", "standard", "detailed"]},
+            "check_understanding": {"type": "boolean"}
+          }
+        },
+        "turn_taking": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["questions_per_turn", "on_interruption"],
+          "properties": {
+            "questions_per_turn": {"type": "integer", "minimum": 1, "maximum": 2},
+            "question_style": {"enum": ["closed", "open", "choice"]},
+            "on_interruption": {"enum": ["stop_and_yield", "stop_acknowledge_resume"]}
+          }
+        },
+        "objection_handling": {
+          "type": "object",
+          "description": "Keyed by objection category. Steps describe conversational moves only; facts come from the policy layer's approved answers.",
+          "additionalProperties": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+        },
+        "re_engagement": {"type": "string"},
+        "example_dialogue": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["speaker", "text"],
+            "properties": {"speaker": {"enum": ["agent", "seller"]}, "text": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "matching": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["segment_id"],
+      "properties": {
+        "segment_id": {"type": ["integer", "null"], "description": "Segment label in the matcher model; null for neutral"},
+        "prototype": {
+          "type": "object",
+          "description": "Feature -> {center, scale}, for the prototype scorer (bootstrap / fallback)",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["center", "scale"],
+            "properties": {"center": {"type": "number"}, "scale": {"type": "number", "exclusiveMinimum": 0}}
+          }
+        }
+      }
+    },
+    "switching": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "switch_away_signals": {"type": "array", "items": {"type": "string"}, "description": "Human-readable conditions; enforced by the state machine thresholds"},
+        "threshold_overrides": {"type": "object", "additionalProperties": {"type": "number"}}
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validated"],
+      "properties": {
+        "validated": {"type": "boolean"},
+        "approved_by": {"type": ["string", "null"]},
+        "approved_at": {"type": ["string", "null"]},
+        "experiment_ids": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

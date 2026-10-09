@@ -1,0 +1,373 @@
+{
+  "_meta": {
+    "answered_calls": 269455,
+    "sellers": 149363,
+    "baseline_meeting_rate": 0.1151,
+    "outcome": "meeting_fixed on answered VANI bot calls, Apr-Sep 2026"
+  },
+  "new_seller": {
+    "claim": "Sellers GST-registered in 2024 or later fix meetings more often: open warmly and explain the benefit.",
+    "stats": {
+      "rate_group": 0.1416,
+      "rate_rest": 0.0993,
+      "n_group": 100351,
+      "n_rest": 169104,
+      "diff": 0.0423,
+      "ci95": [
+        0.0397,
+        0.0449
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls x seller file (gst_registration_year)",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "high_turnover": {
+    "claim": "Sellers with turnover >= 1.5 Cr fix fewer meetings and hang up sooner: be concise, more formal, value-first.",
+    "stats": {
+      "rate_group": 0.0882,
+      "rate_rest": 0.1194,
+      "n_group": 37072,
+      "n_rest": 232383,
+      "diff": -0.0312,
+      "ci95": [
+        -0.0344,
+        -0.0281
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls x seller file (annual_turnover)",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "limited_company": {
+    "claim": "Limited companies fix fewer meetings than proprietorships: more formal register.",
+    "stats": {
+      "rate_group": 0.0998,
+      "rate_rest": 0.1161,
+      "n_group": 16803,
+      "n_rest": 252652,
+      "diff": -0.0163,
+      "ci95": [
+        -0.021,
+        -0.0116
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls x seller file (business_type)",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "past_frustration": {
+    "claim": "Sellers who showed frustration before fix fewer meetings: calm, slower, apologetic, offer a callback early.",
+    "stats": {
+      "rate_group": 0.0633,
+      "rate_rest": 0.1152,
+      "n_group": 458,
+      "n_rest": 268997,
+      "diff": -0.0519,
+      "ci95": [
+        -0.0742,
+        -0.0295
+      ],
+      "strength": "weak"
+    },
+    "source": "bot calls x seller file (showed_frustration)",
+    "strength": "weak",
+    "caveat": "Flag summarizes the same Apr-Sep calls; includes the call where it was raised."
+  },
+  "asked_if_bot": {
+    "claim": "Sellers who asked if they were talking to a bot: say up front that this is IndiaMART's AI assistant.",
+    "stats": {
+      "rate_group": 0.1111,
+      "rate_rest": 0.1151,
+      "n_group": 351,
+      "n_rest": 269104,
+      "diff": -0.004,
+      "ci95": [
+        -0.0369,
+        0.0289
+      ],
+      "strength": "inconclusive"
+    },
+    "source": "bot calls x seller file (asked_if_talking_to_bot)",
+    "strength": "inconclusive",
+    "caveat": "Flag summarizes the same Apr-Sep calls; includes the call where it was raised."
+  },
+  "already_in_touch": {
+    "claim": "Sellers already in touch with an executive fix fewer meetings and talk longer: acknowledge it first.",
+    "stats": {
+      "rate_group": 0.0813,
+      "rate_rest": 0.1171,
+      "n_group": 15405,
+      "n_rest": 254050,
+      "diff": -0.0358,
+      "ci95": [
+        -0.0403,
+        -0.0313
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls x seller file (already_in_touch_with_executive)",
+    "strength": "moderate",
+    "caveat": "Flag summarizes the same Apr-Sep calls; includes the call where it was raised."
+  },
+  "do_not_call": {
+    "claim": "Sellers who asked not to be called almost never fix meetings: suppress the call (policy, not persona).",
+    "stats": {
+      "rate_group": 0.0201,
+      "rate_rest": 0.1172,
+      "n_group": 5719,
+      "n_rest": 263736,
+      "diff": -0.097,
+      "ci95": [
+        -0.1009,
+        -0.0932
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls x seller file (do_not_call_requested)",
+    "strength": "moderate",
+    "caveat": "Flag summarizes the same Apr-Sep calls; includes the call where it was raised."
+  },
+  "short_call_history": {
+    "claim": "Sellers whose earlier calls averaged < 25 s hang up early again: shorten turns and get to the point fast.",
+    "stats": {
+      "rate_group": 0.0325,
+      "rate_rest": 0.0825,
+      "n_group": 63036,
+      "n_rest": 76290,
+      "diff": -0.0501,
+      "ci95": [
+        -0.0524,
+        -0.0477
+      ],
+      "strength": "moderate",
+      "median_duration_group_s": 11.0,
+      "median_duration_rest_s": 22.0
+    },
+    "source": "bot calls, prior calls only (prior_dur_mean)",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "prior_call_later": {
+    "claim": "Sellers who said 'call later' before: reference the callback and ask for a time early.",
+    "stats": {
+      "rate_group": 0.0655,
+      "rate_rest": 0.0564,
+      "n_group": 53582,
+      "n_rest": 85744,
+      "diff": 0.0091,
+      "ci95": [
+        0.0065,
+        0.0117
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls, prior calls only",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "prior_not_interested": {
+    "claim": "Sellers who said 'not interested' before: short, low-pressure, give one reason then offer to end.",
+    "stats": {
+      "rate_group": 0.0428,
+      "rate_rest": 0.0835,
+      "n_group": 80863,
+      "n_rest": 58463,
+      "diff": -0.0406,
+      "ci95": [
+        -0.0433,
+        -0.038
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls, prior calls only",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "first_call": {
+    "claim": "First answered call to a seller (no prior history): default settings; live adaptation corrects them.",
+    "stats": {
+      "rate_group": 0.1742,
+      "rate_rest": 0.0599,
+      "n_group": 130129,
+      "n_rest": 139326,
+      "diff": 0.1144,
+      "ci95": [
+        0.112,
+        0.1168
+      ],
+      "strength": "moderate"
+    },
+    "source": "bot calls, prior calls only",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "personalised_trial": {
+    "claim": "The personalised-script trial fixed more meetings than other versions on the same days: personalise the opening.",
+    "stats": {
+      "rate_group": 0.1416,
+      "rate_rest": 0.1262,
+      "n_group": 452,
+      "n_rest": 1442,
+      "diff": 0.0154,
+      "ci95": [
+        -0.021,
+        0.0518
+      ],
+      "strength": "inconclusive"
+    },
+    "source": "bot calls, lead_bot_version on trial days",
+    "strength": "weak",
+    "caveat": "Not randomized; ran on few days. Treat as a hint, not proof."
+  },
+  "language_by_state": {
+    "claim": "Share of transcribed calls where the seller spoke mostly English, by state (>= 100 calls).",
+    "stats": {
+      "overall_english_leaning": 0.0257,
+      "devanagari_turn_share": 0.0019,
+      "by_state": {
+        "Tamil Nadu": {
+          "n": 208,
+          "english_leaning": 0.3317
+        },
+        "Telangana": {
+          "n": 279,
+          "english_leaning": 0.0538
+        },
+        "Odisha": {
+          "n": 164,
+          "english_leaning": 0.0366
+        },
+        "Maharashtra": {
+          "n": 1884,
+          "english_leaning": 0.0297
+        },
+        "Madhya Pradesh": {
+          "n": 418,
+          "english_leaning": 0.0263
+        },
+        "Haryana": {
+          "n": 575,
+          "english_leaning": 0.0261
+        },
+        "Delhi": {
+          "n": 1242,
+          "english_leaning": 0.0233
+        },
+        "Punjab": {
+          "n": 394,
+          "english_leaning": 0.0203
+        },
+        "Rajasthan": {
+          "n": 909,
+          "english_leaning": 0.0154
+        },
+        "Uttar Pradesh": {
+          "n": 2162,
+          "english_leaning": 0.0148
+        },
+        "Gujarat": {
+          "n": 2547,
+          "english_leaning": 0.0133
+        },
+        "Bihar": {
+          "n": 165,
+          "english_leaning": 0.0121
+        },
+        "West Bengal": {
+          "n": 607,
+          "english_leaning": 0.0115
+        }
+      }
+    },
+    "source": "ps07_call_turns (function-word language share)",
+    "strength": "moderate",
+    "caveat": "Transcript subset over-represents meetings; romanized text, so regional languages are undercounted."
+  },
+  "language_by_business_type": {
+    "claim": "Limited companies lean English slightly more often than proprietorships.",
+    "stats": {
+      "Limited Company": {
+        "n": 580,
+        "english_leaning": 0.0517
+      },
+      "Others": {
+        "n": 8,
+        "english_leaning": 0.0
+      },
+      "Partnership": {
+        "n": 1188,
+        "english_leaning": 0.032
+      },
+      "Proprietorship": {
+        "n": 10068,
+        "english_leaning": 0.0232
+      }
+    },
+    "source": "ps07_call_turns",
+    "strength": "weak",
+    "caveat": ""
+  },
+  "price_inconsistency": {
+    "claim": "Today's VANI states different prices on different calls: personas never state prices; the executive does.",
+    "stats": {
+      "bot_turns_with_a_price": 207,
+      "distinct_amounts_quoted": [
+        "2-3 hazaar",
+        "30,200",
+        "32,000",
+        "35,000",
+        "37,760",
+        "4,000"
+      ]
+    },
+    "source": "ps07_call_turns, bot turns",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "identity_drop": {
+    "claim": "17.3% of evaluated calls drop right after the IndiaMART / identity moment and 25.2% never respond: keep the first turn short, check the line, and state purpose and benefit together.",
+    "stats": {
+      "drop_after_identity_share": 0.173,
+      "never_respond_share": 0.252
+    },
+    "source": "disposition evaluator, docs/findings/dataset_overview.md",
+    "strength": "moderate",
+    "caveat": ""
+  },
+  "bot_latency": {
+    "claim": "Calls where the bot's median reply lag is <= 1.5 s fix ~25% vs 4.6% above 3 s: adaptation must add no delay.",
+    "stats": {
+      "mf_lag_le_1_5s": 0.25,
+      "mf_lag_gt_2s": 0.138,
+      "mf_lag_gt_3s": 0.046
+    },
+    "source": "latency_repetition evaluator, docs/findings/dataset_overview.md",
+    "strength": "moderate",
+    "caveat": "Correlational; long lag also follows long seller turns."
+  },
+  "voice_gender": {
+    "claim": "VANI has always used one female voice ('Payal ... bol rahi hoon'); no data compares genders.",
+    "stats": {},
+    "source": "none in the export",
+    "strength": "informed_guess",
+    "caveat": ""
+  },
+  "voice_speaker": {
+    "claim": "Speaker per language follows Sarvam's quality ranking; tone-to-speaker mapping is a design choice.",
+    "stats": {},
+    "source": "none in the export",
+    "strength": "informed_guess",
+    "caveat": ""
+  },
+  "pitch": {
+    "claim": "No pitch variation exists in past calls.",
+    "stats": {},
+    "source": "none in the export",
+    "strength": "informed_guess",
+    "caveat": ""
+  }
+}

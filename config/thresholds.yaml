@@ -1,0 +1,50 @@
+# Every value here is a TUNABLE STARTING POINT, not a validated fact.
+# `validated: false` stays until offline evaluation (and, for runtime values,
+# the shadow / A/B phases) has justified the value. Record the evidence when flipping it.
+validated: false
+
+segmentation:
+  k_range: [3, 6]
+  min_seller_turns: 3            # calls with fewer seller turns are excluded from discovery
+  min_seller_tokens: 3            # low on purpose: a higher bar silently drops terse sellers (seen on synthetic data)
+  min_asr_confidence: 0.6        # applied only if the export has ASR confidence
+  max_feature_missing: 0.3
+  min_stratum_n: 50              # residualization backs off to coarser strata below this
+  min_segment_share: 0.05
+  min_bootstrap_ari: 0.7
+  min_temporal_ari: 0.6
+  min_centroid_distance: 0.5     # RMS distance in standardized units
+  min_silhouette: 0.05           # behavioural data rarely clusters crisply; low bar, reviewed by humans
+  bootstrap_rounds: 20
+  silhouette_sample: 5000
+  distinguishing_z: 0.5          # |segment mean - overall| in SD units to call a feature "distinctive"
+  # Features excluded from clustering after the data audit, with the reason (reported in segmentation_report.md).
+  exclude_features:
+    response_latency_median_ms: >-
+      PS07 timestamps are evaluator-derived: 50% of seller turns start exactly when the
+      bot turn ends (boundaries snapped), so measured latency is not behaviour
+    overlap_rate: same timestamp limitation; overlaps cannot be measured reliably
+
+matching:
+  min_seller_turns_before_commit: 2
+  commit_threshold: 0.60         # calibrated probability needed to leave neutral
+  early_window_turns: [1, 2, 3, 4, 5]
+  prototype_temperature: 0.5     # only for the uncalibrated prototype scorer (illustrative value)
+  matcher_timeout_ms: 30
+  recent_window_seller_turns: 3   # live features use the last K seller turns so mid-call change is visible
+
+switching:
+  switch_threshold: 0.65         # challenger probability needed to switch
+  switch_margin: 0.15            # challenger must beat the current persona by this much
+  confirm_evaluations: 2         # consecutive evaluations the challenger must win
+  min_dwell_seller_turns: 2      # minimum seller turns on a persona before switching away
+  switch_back_cooldown_turns: 4  # no return to the previous persona within this many seller turns
+  max_switches_per_call: 2
+  revert_floor: 0.35             # current persona below this for `revert_evaluations` -> neutral
+  revert_evaluations: 3
+
+experiment:
+  alpha: 0.05
+  power: 0.8
+  holdout_share: 0.05            # permanent control holdout after rollout (feedback-loop bias guard)
+  exploration_epsilon: 0.05      # share of treatment calls where the persona is randomized among plausible ones

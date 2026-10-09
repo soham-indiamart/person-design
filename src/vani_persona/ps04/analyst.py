@@ -1,0 +1,204 @@
+"""Behaviour Analyst agent: reads the live transcript and reports the seller's state.
+
+A separate Sarvam LLM call after every seller turn. It sees the last few turns of the
+conversation (both sides), the persona VANI is using and its own previous verdict, so it
+can tell escalation and calming apart, not just spot single phrases. Output:
+
+    {state: calm|aggressive|rushed|confused|interested|suspicious,
+     intensity: 0-1, trend: escalating|steady|calming, evidence, rationale}
+
+Phrase lexicons run alongside it. They are the fallback when the LLM call fails, times
+out or hits the credit cap, and a safety net: an explicit aggression phrase is never
+overruled by a "calm" verdict.
+
+    python -m vani_persona.ps04.analyst --selftest     # ~30 labelled turns, ~1 credit
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import time
+from dataclasses import asdict, dataclass
+
+from vani_persona.features import lexicons as lx
+from vani_persona.features.transcript import normalize
+from vani_persona.ps04 import sarvam
+from vani_persona.ps04.live_personas import PERSONAS, SELLER_STATES
+from vani_persona.ps04.signals import CONFUSION, FRUSTRATION, INTEREST, RUSH, _compile
+
+WINDOW_TURNS = 6
+TIMEOUT_S = 2.5
+
+AGGRESSION = FRUSTRATION + [
+    "dimaag kharab", "dimag kharab", "dimaag mat kha", "shut up", "chup", "bakwaas", "pagal", "bewakoof",
+    "kya mazaak", "mazak hai", "harass", "harassment", "stop calling", "again and again", "complaint karunga", "police", "block kar", "nonsense", "rubbish",
+    "दिमाग खराब", "पागल", "बेवकूफ", "मज़ाक", "शिकायत",
+]
+# Identity questions ("who is this", "kaun bol") are normal at call start, not suspicion.
+SUSPICION = [p for p in lx.OBJECTION_TRUST if p not in {"who is this", "kaun bol", "kahan se"}] + [
+    "bot ho", "robot", "machine ho", "recorded", "real person", "insaan ho", "asli", "otp", "how did you get my number",
+    "बॉट", "रोबोट", "असली", "नंबर कहाँ से",
+]
+LEXICONS = {
+    "aggressive": _compile(AGGRESSION), "suspicious": _compile(SUSPICION), "confused": _compile(CONFUSION),
+    "rushed": _compile(RUSH), "interested": _compile(INTEREST),
+}
+PRIORITY = ["aggressive", "suspicious", "confused", "rushed", "interested", "calm"]
+
+PROMPT = """You are a call-behaviour analyst watching a live phone call between Payal (IndiaMART's voice assistant) and a seller. Read the conversation and judge the seller's state RIGHT NOW, at their latest turn, in the context of the whole conversation.
+
+States (pick one):
+- calm: neutral, polite, answering normally, asking who is calling at the start.
+- aggressive: irritated, angry, rude, complaining about repeated calls, raising their voice in words.
+- rushed: busy, wants it quick, asks to get to the point or call later.
+- confused: did not understand, asks what or why, asks to repeat.
+- interested: wants details, asks how or when, agrees to meet or proposes a time.
+- suspicious: doubts the caller is genuine (fraud, spam, bot, how did you get my number).
+
+Also give:
+- intensity 0-1 (how strong; 0.3 mild, 0.6 clear, 0.9 extreme),
+- trend versus their previous turns: escalating, steady or calming,
+- evidence: the seller's words that show it (max 12 words, copy them),
+- rationale: one short sentence.
+
+Rules: judge the seller only, never Payal. Politeness alone is not interest. "Kaun?" or "who is this?" at the start is calm. If the seller was aggressive and now answers normally, that is calm with trend calming. Code-mixed Hinglish and any Indian language are normal.
+
+Examples:
+Seller: "haan ji bolo, kaun?" -> {"state":"calm","intensity":0.3,"trend":"steady"}
+Seller: "kitni baar call karoge yaar, dimaag kharab kar diya" -> {"state":"aggressive","intensity":0.85,"trend":"escalating"}
+Seller (after being angry): "achha theek hai, bolo kya hai" -> {"state":"calm","intensity":0.4,"trend":"calming"}
+Seller: "fraud call hai kya? number kahan se mila?" -> {"state":"suspicious","intensity":0.75,"trend":"escalating"}
+Seller: "dukaan pe hoon, jaldi bolo" -> {"state":"rushed","intensity":0.7,"trend":"steady"}
+Seller: "kal kitne baje aa sakte ho?" -> {"state":"interested","intensity":0.8,"trend":"steady"}
+
+Return only JSON: {"state": "...", "intensity": 0.0, "trend": "...", "evidence": "...", "rationale": "..."}"""
+
+
+@dataclass
+class Verdict:
+    state: str
+    intensity: float
+    trend: str
+    evidence: str
+    rationale: str
+    source: str            # analyst | lexicon | analyst+lexicon
+    lexicon: dict
+    ms: int = 0
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+def lexicon_states(texts: list[str]) -> dict[str, str]:
+    hits = {}
+    for state, pat in LEXICONS.items():
+        for t in texts:
+            m = pat.search(normalize(t or ""))
+            if m:
+                hits[state] = m.group(0)
+                break
+    return hits
+
+
+def _lexicon_verdict(hits: dict, note: str) -> Verdict:
+    for state in PRIORITY:
+        if state in hits:
+            return Verdict(state, 0.8, "steady", hits[state], f"Phrase '{hits[state]}' ({note}).", "lexicon", hits)
+    return Verdict("calm", 0.3, "steady", "", f"No phrase matched ({note}).", "lexicon", hits)
+
+
+def _format(turns: list[tuple[str, str]]) -> str:
+    return "\n".join(f"{'Payal' if r == 'bot' else 'Seller'}: {t}" for r, t in turns[-WINDOW_TURNS:])
+
+
+def analyse(turns: list[tuple[str, str]], romanized_latest: str, persona_id: str,
+            previous: Verdict | None = None, use_llm: bool = True) -> Verdict:
+    """``turns``: (role, text) pairs ending with the seller's latest turn."""
+    latest = turns[-1][1] if turns else ""
+    hits = lexicon_states([latest, romanized_latest])
+    if not use_llm:
+        return _lexicon_verdict(hits, "LLM analyst off")
+    prev = (f"Your previous verdict: {previous.state} (intensity {previous.intensity:.1f}, {previous.trend})."
+            if previous else "No previous verdict (first seller turn).")
+    user = (f"Payal is currently speaking as: {PERSONAS[persona_id].name}.\n{prev}\n\n"
+            f"Conversation (latest last):\n{_format(turns)}")
+    t0 = time.perf_counter()
+    try:
+        content, _ = sarvam.chat([{"role": "system", "content": PROMPT}, {"role": "user", "content": user}],
+                                 max_tokens=160, temperature=0.0, json_mode=True, timeout=TIMEOUT_S, retries=0)
+        m = re.search(r"\{.*\}", content, re.S)
+        o = json.loads(m.group(0)) if m else {}
+        state = str(o.get("state", "")).lower().strip()
+        if state not in SELLER_STATES:
+            raise ValueError(f"bad state {state!r}")
+        v = Verdict(state, max(0.0, min(1.0, float(o.get("intensity", 0.5) or 0.5))),
+                    str(o.get("trend", "steady")).lower() if str(o.get("trend", "")).lower() in
+                    {"escalating", "steady", "calming"} else "steady",
+                    str(o.get("evidence", ""))[:120], str(o.get("rationale", ""))[:200], "analyst", hits)
+    except (sarvam.SarvamError, ValueError, TypeError) as e:
+        v = _lexicon_verdict(hits, f"analyst unavailable: {type(e).__name__}")
+    v.ms = int((time.perf_counter() - t0) * 1000)
+    if v.source == "analyst":
+        if "aggressive" in hits and v.state != "aggressive":
+            # Safety net: an explicit aggression phrase wins over a softer reading.
+            v = Verdict("aggressive", max(0.7, v.intensity), "escalating", hits["aggressive"],
+                        f"Aggression phrase '{hits['aggressive']}' overrides analyst '{v.state}'.",
+                        "lexicon", hits, v.ms)
+        elif v.state in hits:
+            v.source = "analyst+lexicon"
+    return v
+
+
+SELFTEST = [
+    ("calm", "हाँ जी, बोलिए, कौन?"), ("calm", "haan ji batao"), ("calm", "Hello, yes, who is this?"),
+    ("calm", "ji main hi bol raha hoon, boliye"), ("calm", "achha, theek hai, aage bataiye"),
+    ("aggressive", "kitni baar call karoge yaar, pareshan kar diya hai"),
+    ("aggressive", "dimaag kharab mat karo, bakwas band karo"),
+    ("aggressive", "Stop calling me again and again, this is harassment"),
+    ("aggressive", "बार बार फोन क्यों करते हो, तंग आ गया हूँ"),
+    ("aggressive", "tumhara roz ka yahi drama hai, complaint karunga"),
+    ("rushed", "abhi busy hoon, jaldi bolo"), ("rushed", "dukaan pe customer hai, short mein batao"),
+    ("rushed", "I'm driving, make it quick"), ("rushed", "baad mein call karna, abhi meeting mein hoon"),
+    ("confused", "samajh nahi aaya, kaun si meeting?"), ("confused", "matlab kya hai iska?"),
+    ("confused", "Sorry, I didn't get you, what is this about?"), ("confused", "क्या बोला आपने? फिर से बताइए"),
+    ("interested", "kal kitne baje aa sakte hain?"), ("interested", "achha, kaise kaam karta hai ye, detail mein batao"),
+    ("interested", "Sounds good, when can your executive come?"), ("interested", "theek hai meeting rakh lo, 12 baje"),
+    ("suspicious", "fraud call hai kya? number kahan se mila?"), ("suspicious", "aap bot ho kya? real person se baat karao"),
+    ("suspicious", "How do I know this is really IndiaMART?"), ("suspicious", "ye spam to nahi hai?"),
+    ("calm", "nahi nahi, main sun raha hoon, bolo"), ("rushed", "2 minute mein batao jo bhi hai"),
+    ("aggressive", "pagal samjha hai kya, phone rakho"), ("interested", "haan bhejo executive ko, Surat mein hoon"),
+]
+
+
+def selftest(use_llm: bool = True) -> None:
+    import collections
+    conf = collections.Counter()
+    ok = 0
+    opener = ("bot", "Namaste, main IndiaMART se Payal bol rahi hoon. Aapke business ke liye ek chhoti meeting rakhni thi.")
+    for gold, text in SELFTEST:
+        v = analyse([opener, ("seller", text)], text, "normal", use_llm=use_llm)
+        conf[(gold, v.state)] += 1
+        ok += v.state == gold
+        if v.state != gold:
+            print(f"  miss: gold={gold:<11} got={v.state:<11} ({v.source}) {text[:60]}")
+    print(f"\naccuracy {ok}/{len(SELFTEST)} = {ok / len(SELFTEST):.0%} ({'analyst' if use_llm else 'lexicon only'})")
+    states = list(PRIORITY)
+    print("gold \\ predicted | " + " | ".join(s[:5] for s in states))
+    for g in states:
+        print(f"{g:<16} | " + " | ".join(f"{conf[(g, p)]:>5}" for p in states))
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--lexicon-only", action="store_true")
+    args = ap.parse_args()
+    if args.selftest:
+        selftest(use_llm=not args.lexicon_only)
+        print(json.dumps(sarvam.BUDGET.status(), indent=2) if not args.lexicon_only else "")
+
+
+if __name__ == "__main__":
+    main()

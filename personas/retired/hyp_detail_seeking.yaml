@@ -1,0 +1,77 @@
+# RETIRED 2026-10-09: no supporting segment in run seg-63b6bc47e6. Genuine clarification
+# requests were stable but only 3.5% of calls; they are handled by the repeated_clarification override.
+# ILLUSTRATIVE HYPOTHESIS: not derived from VANI call data yet. See hyp_time_pressed_direct.yaml.
+schema_version: "1.0"
+persona_id: hyp_detail_seeking
+version: 0.1.0
+name: Detail-seeking, needs explanation (hypothesis)
+status: retired
+audience:
+  party: seller
+  call_objectives: ["*"]
+definition:
+  behavioural_summary: >-
+    Seller asks follow-up questions, gives longer replies and occasionally asks
+    for clarification. Hypothesized need: step-by-step explanation, one concept
+    per turn, and comprehension checks.
+  distinctive_features:
+    - {feature: question_rate, direction: high, z: null}
+    - {feature: seller_mean_tokens, direction: high, z: null}
+    - {feature: clarification_rate, direction: high, z: null}
+    - {feature: short_reply_ratio, direction: low, z: null}
+  evidence:
+    source: "none (hypothesis)"
+    segment_id: null
+    n_calls: null
+  confidence: none
+  limitations:
+    - Clarification requests may reflect audio quality rather than a need for detail.
+    - Asking many questions can be scepticism (trust) rather than curiosity. The objection mix decides which.
+style:
+  tone: warm
+  pace:
+    tts_rate: 0.95
+    pause_after_question_ms: 900
+    endpointing_patience_ms: 1200
+  language:
+    policy: mirror_seller
+    register: conversational
+  opening: >-
+    Introduction plus one sentence of context on why the call matters to the
+    seller's business, then ask whether now is a good time.
+  explanation:
+    max_sentences_per_turn: 4
+    density: detailed
+    check_understanding: true
+  turn_taking:
+    questions_per_turn: 1
+    question_style: open
+    on_interruption: stop_acknowledge_resume
+  objection_handling:
+    price: [acknowledge, answer_with_approved_fact, explain_what_is_included_from_policy, confirm_understood]
+    trust: [acknowledge_concern, state_identity_and_purpose, offer_verification_route_from_policy, confirm_understood]
+    confusion: [apologise_briefly, rephrase_in_simpler_words, give_one_example, confirm_understood]
+    not_interested: [acknowledge, ask_one_reason_once, respect_decision_and_close]
+    default: [acknowledge, answer_with_approved_fact, confirm_understood, return_to_objective]
+  re_engagement: >-
+    Ask an open question about the seller's business that connects to the
+    objective, e.g. which products get the most enquiries.
+  example_dialogue:
+    - {speaker: seller, text: "Ye photos add karne se kya fayda hoga? Aur kaise karna hai?"}
+    - {speaker: agent, text: "Accha sawaal hai. Photos waale products buyers ko zyada dikhte hain. Main WhatsApp pe ek link bhejungi, usme har product ke saamne 'Add photo' ka button hai. Kya ye process clear hai?"}
+matching:
+  segment_id: null
+  prototype:   # HYPOTHESIZED values for the demo/bootstrap scorer only
+    short_reply_ratio: {center: 0.25, scale: 0.25}
+    seller_mean_tokens: {center: 10.0, scale: 5.0}
+    question_rate: {center: 0.45, scale: 0.2}
+    clarification_rate: {center: 0.1, scale: 0.2}
+    brevity_request_rate: {center: 0.0, scale: 0.1}
+    time_pressure_rate: {center: 0.0, scale: 0.1}
+switching:
+  switch_away_signals:
+    - Brevity requests or time-pressure statements appear.
+    - Replies shrink to minimal acknowledgements for several turns.
+evaluation:
+  validated: false
+  notes: Illustrative only. Must not serve traffic until replaced by a validated segment.

@@ -1,0 +1,69 @@
+# Raw export -> canonical CallRecord mapping.
+#
+# PLACEHOLDER VALUES: the real export has not been audited yet. Run
+#   .venv/bin/python -m vani_persona.audit data/raw --columns-only
+# to list the actual columns, then edit this file.
+#
+# Two layouts are supported:
+#   long: one row per turn (call_id, speaker, text, [start_ms, end_ms, ...])
+#   wide: one row per call, full transcript in one text column ("Agent: ...\nSeller: ...")
+layout: wide
+
+call_id: call_id
+seller_id: seller_id            # pseudonymized at ingest with VANI_PSEUDONYM_SALT
+
+context:
+  campaign_id: campaign_id
+  call_objective: call_objective
+  lead_type: lead_type
+  seller_category: category
+  language_hint: language
+  started_at: call_start_time
+  agent_version: agent_version
+  script_version: script_version
+  region: state
+
+outcome:
+  disposition_raw: disposition
+  objective_achieved: objective_achieved   # optional bool-like column
+  downstream_conversion: converted         # optional, may arrive later
+  termination_reason: end_reason
+
+# long layout only
+turn:
+  speaker: speaker
+  text: text
+  start_ms: start_ms
+  end_ms: end_ms
+  asr_confidence: asr_confidence
+  interrupted: interrupted
+  order_by: turn_index
+
+# wide layout only
+transcript:
+  column: transcript
+  # Line prefixes identifying each speaker (case-insensitive).
+  agent_prefixes: ["agent", "bot", "vani", "assistant", "ai"]
+  seller_prefixes: ["seller", "user", "customer", "supplier", "human", "caller"]
+
+# Raw disposition (lower-cased, stripped) -> DispositionClass.
+# Anything unmapped becomes "other" and is listed in the audit report.
+disposition_map:
+  completed: objective_completed
+  success: objective_completed
+  interested: objective_completed
+  callback: callback_requested
+  call back later: callback_requested
+  not interested: not_interested
+  dnd: opt_out
+  do not call: opt_out
+  hung up: seller_hung_up
+  disconnected: seller_hung_up
+  no response: no_response
+  silence: no_response
+  technical issue: technical_failure
+  failed: technical_failure
+
+# DispositionClass values that count as "objective achieved" when no explicit
+# objective_achieved column exists. Confirm with the business owner.
+objective_achieved_classes: [objective_completed]

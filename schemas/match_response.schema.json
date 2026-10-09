@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/match_response.schema.json",
+  "title": "Persona match response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "call_id", "turn_index", "scores", "best_persona_id", "confidence", "calibrated", "abstained", "reason", "evidence", "uncertain_signals", "scorer", "model_version"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.\\d+$"},
+    "call_id": {"type": "string"},
+    "turn_index": {"type": "integer", "minimum": 0},
+    "scores": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}},
+    "best_persona_id": {"type": "string", "description": "neutral_default when abstained"},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "calibrated": {"type": "boolean", "description": "false for the prototype scorer: confidence is a relative score, not a probability"},
+    "abstained": {"type": "boolean"},
+    "reason": {"type": "string"},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["feature", "value", "detail"],
+        "properties": {"feature": {"type": "string"}, "value": {"type": ["number", "null"]}, "detail": {"type": "string"}}
+      }
+    },
+    "uncertain_signals": {"type": "array", "items": {"type": "string"}},
+    "scorer": {"enum": ["logistic", "prototype"]},
+    "model_version": {"type": "string"},
+    "latency_ms": {"type": "number", "minimum": 0}
+  }
+}

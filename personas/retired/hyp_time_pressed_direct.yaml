@@ -1,0 +1,80 @@
+# RETIRED 2026-10-09: superseded by personas/time_pressed.yaml (segment 2 of run seg-63b6bc47e6).
+# ILLUSTRATIVE HYPOTHESIS: not derived from VANI call data yet.
+# Replace definition.evidence / matching.prototype with segmentation output
+# (artifacts/persona_prototypes.yaml + docs/findings/segmentation_report.md)
+# or retire this persona if no matching segment is found.
+schema_version: "1.0"
+persona_id: hyp_time_pressed_direct
+version: 0.1.0
+name: Time-pressed, direct (hypothesis)
+status: retired
+audience:
+  party: seller
+  call_objectives: ["*"]
+definition:
+  behavioural_summary: >-
+    Seller gives short replies, signals being busy or asks VANI to get to the
+    point. Hypothesized need: fewer words per turn, the ask up front, and an easy
+    callback option.
+  distinctive_features:
+    - {feature: short_reply_ratio, direction: high, z: null}
+    - {feature: brevity_request_rate, direction: high, z: null}
+    - {feature: time_pressure_rate, direction: high, z: null}
+    - {feature: seller_mean_tokens, direction: low, z: null}
+  evidence:
+    source: "none (hypothesis)"
+    segment_id: null
+    n_calls: null
+  confidence: none
+  limitations:
+    - Short replies also come from noisy lines, ASR drops and polite backchannels.
+    - Being busy is a state of the moment, not a trait. The same seller may differ on the next call.
+style:
+  tone: brisk_professional
+  pace:
+    tts_rate: 1.08
+    pause_after_question_ms: 400
+    endpointing_patience_ms: 700
+  language:
+    policy: mirror_seller
+    register: conversational
+  opening: >-
+    One-sentence introduction that names IndiaMART and the single ask, plus an
+    explicit offer to call back later.
+  explanation:
+    max_sentences_per_turn: 1
+    density: minimal
+    check_understanding: false
+  turn_taking:
+    questions_per_turn: 1
+    question_style: closed
+    on_interruption: stop_and_yield
+  objection_handling:
+    no_time: [acknowledge, offer_callback_slot_choice, log_callback_and_close]
+    price: [acknowledge, answer_with_approved_fact_one_sentence, offer_details_on_whatsapp]
+    trust: [state_identity_and_purpose_one_sentence, offer_verification_route_from_policy]
+    not_interested: [acknowledge, respect_decision_and_close]
+    default: [acknowledge, answer_with_approved_fact_one_sentence, return_to_objective]
+  re_engagement: >-
+    Do not re-pitch. Restate the single remaining ask as a yes/no question, or
+    offer to send details and end the call.
+  example_dialogue:
+    - {speaker: seller, text: "Haan bolo jaldi, busy hoon."}
+    - {speaker: agent, text: "Ji, bas ek baat: aapke catalog mein photos missing hain, kya main WhatsApp pe link bhej doon?"}
+    - {speaker: seller, text: "Haan bhej do."}
+    - {speaker: agent, text: "Bhej diya. Dhanyavaad, aapka din shubh ho."}
+matching:
+  segment_id: null
+  prototype:   # HYPOTHESIZED values for the demo/bootstrap scorer only
+    short_reply_ratio: {center: 0.7, scale: 0.25}
+    seller_mean_tokens: {center: 3.0, scale: 3.0}
+    brevity_request_rate: {center: 0.1, scale: 0.2}
+    time_pressure_rate: {center: 0.2, scale: 0.2}
+    question_rate: {center: 0.1, scale: 0.2}
+switching:
+  switch_away_signals:
+    - Seller starts asking detailed questions (question_rate and seller_mean_tokens rise).
+    - Repeated clarification requests suggest brevity is costing comprehension.
+evaluation:
+  validated: false
+  notes: Illustrative only. Must not serve traffic until replaced by a validated segment.

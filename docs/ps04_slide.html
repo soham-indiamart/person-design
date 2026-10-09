@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VANI · Seller-fit adaptive persona (PS04)</title>
+<style>
+  @page { size: 1600px 900px; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9ecf2; font: 15px/1.38 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; color: #101828; }
+  .slide { width: 1600px; height: 900px; margin: 0 auto; background: #fff; padding: 30px 38px; display: grid;
+           grid-template-rows: auto 1fr auto; gap: 16px; }
+  h1 { margin: 0; font-size: 30px; letter-spacing: -.01em; }
+  h1 span { color: #2f6fed; }
+  .tag { color: #475467; font-size: 15px; margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: 1.02fr 1fr 1.18fr; gap: 18px; min-height: 0; }
+  .box { border: 1px solid #e4e7ec; border-radius: 12px; padding: 14px 16px; overflow: hidden; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #2f6fed; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14.6px; }
+  td { padding: 4px 4px; border-bottom: 1px solid #f2f4f7; vertical-align: top; }
+  td:first-child { color: #667085; white-space: nowrap; width: 92px; }
+  .why { color: #475467; font-size: 13.3px; }
+  .ev { font-size: 11px; border-radius: 4px; padding: 0 5px; margin-left: 3px; white-space: nowrap; }
+  .mod { background: #ecfdf3; color: #067647; } .weak { background: #fffaeb; color: #b54708; } .guess { background: #f2f4f7; color: #475467; }
+  .stat { display: grid; grid-template-columns: 74px 1fr; gap: 2px 10px; font-size: 14.6px; margin-bottom: 7px; }
+  .stat > b { font-size: 19px; color: #101828; }
+  .flow { display: flex; flex-direction: column; gap: 6px; font-size: 14.6px; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; }
+  .n { width: 24px; height: 24px; border-radius: 50%; background: #2f6fed; color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 12.5px; }
+  .n.live { background: #e8590c; }
+  .sw { background: #fff7ed; border: 1px dashed #fdba74; border-radius: 8px; padding: 7px 9px; font-size: 13.6px; margin-top: 8px; }
+  .foot { display: flex; justify-content: space-between; color: #475467; font-size: 12.8px; border-top: 1px solid #e4e7ec; padding-top: 8px; }
+  code { font-size: 12px; background: #f2f4f7; padding: 0 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <div>
+    <h1>VANI <span>Seller-fit adaptive persona</span>: built per seller before the call, adjusted live on Sarvam</h1>
+    <div class="tag">Persona spec for all 149,363 sellers · every setting has a reason + evidence strength · 6 named live personas picked during the call by a Behaviour-Analyst agent · Saaras → Sarvam LLM → Bulbul, 11 spoken / 23 understood languages</div>
+  </div>
+
+  <div class="grid">
+    <div class="box">
+      <h2>Sample persona spec · "time-pressed" seller</h2>
+      <div class="why" style="margin-bottom:6px">Proprietor, corrugated-box trader, Aligarh (UP), turnover 0–40 L, past calls average 9 s.</div>
+      <table>
+        <tr><td>Voice</td><td>female · <b>ishita</b> (crisp) · pace <b>1.12</b><div class="why">Brisker: short past calls <span class="ev mod">short_call_history</span> · gender = VANI continuity <span class="ev guess">informed guess</span></div></td></tr>
+        <tr><td>Language</td><td><b>Hindi-led Hinglish</b>, respectful-casual ("aap", "ji")<div class="why">~98% of UP sellers spoke Hinglish on past calls <span class="ev mod">language_by_state</span></div></td></tr>
+        <tr><td>Tone</td><td>warmth medium · empathy medium<div class="why">Polite but brisk; acknowledge "busy" once, then move on</div></td></tr>
+        <tr><td>Opening</td><td>Check line → "Payal, IndiaMART" → purpose tied to <i>their box business</i> → ask for a time within 2 turns<div class="why">17% of calls drop right after the identity line <span class="ev mod">identity_drop</span></div></td></tr>
+        <tr><td>Personal&shy;isation</td><td>Category · executive visit in their city · <b>don't ask</b> "manufacturer or trader?" (already known)</td></tr>
+        <tr><td>Objections</td><td>1 busy → callback at their time · 2 call later → one concrete slot · 3 price → never quote; the executive covers it</td></tr>
+        <tr><td>Escalation</td><td>2× refusal → end politely · 2× frustration → apologise + callback · "don't call" → end + flag</td></tr>
+        <tr><td>Guardrails</td><td>Delivery only: facts, prices and compliance lines never change. Truthful if asked "are you a bot?"</td></tr>
+      </table>
+    </div>
+
+    <div class="box">
+      <h2>Past-call evidence behind the rules</h2>
+      <div class="why" style="margin-bottom:8px">269,455 answered calls · baseline 11.5% meetings · 95% CI on every gap · observational (VANI had one voice)</div>
+      <div class="stat"><b>3.2%</b><div>meetings for sellers whose <b>earlier calls averaged &lt;25 s</b> vs 8.2% for other repeat calls → shorter turns, ask early</div></div>
+      <div class="stat"><b>14.2%</b><div>for <b>new sellers</b> (GST 2024+) vs 9.9% → warm, lively voice, explain the benefit</div></div>
+      <div class="stat"><b>8.8%</b><div>for <b>turnover ≥ 1.5 Cr</b> vs 11.9% → concise, formal, value first</div></div>
+      <div class="stat"><b>8.1%</b><div>if <b>already with an executive</b> vs 11.7% → acknowledge it in the opening</div></div>
+      <div class="stat"><b>6.3%</b><div>after <b>past frustration</b> vs 11.5% → calm, slower, callback early <span class="ev weak">weak, n=458</span></div></div>
+      <div class="stat"><b>33%</b><div>of <b>Tamil Nadu</b> sellers spoke mostly English vs ~2% elsewhere → English-first there</div></div>
+      <div class="stat"><b>6</b><div>different prices quoted by today's VANI (from "2–3 thousand a month" to ₹37,760) → personas <b>never state prices</b></div></div>
+      <div class="stat"><b>~25%</b><div>meetings at ≤1.5 s bot lag vs 4.6% above 3 s → adaptation must not add delay</div></div>
+    </div>
+
+    <div class="box">
+      <h2>Workflow · data flow · integration</h2>
+      <div class="flow">
+        <div class="step"><div class="n">1</div><div><b>Seller file → persona generator</b> (rules + <code>ps04_evidence.json</code>): voice, language, tone, plan, a reason and a confidence per setting. Missing fields → defaults marked low confidence.</div></div>
+        <div class="step"><div class="n live">2</div><div><b>Seller speaks → Saaras v3</b>: native-script transcript + romanized copy (two parallel calls) + language ID across 23 languages.</div></div>
+        <div class="step"><div class="n live">3</div><div><b>Behaviour Analyst agent</b> (sarvam-105b-conversations) reads the last 6 turns: seller is calm / aggressive / rushed / confused / interested / suspicious, with intensity + trend. Phrase lexicons are the fallback and the aggression safety net.</div></div>
+        <div class="step"><div class="n live">4</div><div><b>Persona Director</b> switches between 6 named personas (Friendly Guide, Calm De-escalator, Quick &amp; Direct, Patient Explainer, Enthusiastic Closer, Transparent Reassurer) with hysteresis; back to Friendly Guide after 2 calm turns. Same voice, new delivery. Language mirroring runs alongside. Every switch → <b>switch log</b>.</div></div>
+        <div class="step"><div class="n live">5</div><div><b>Sarvam LLM</b> writes the reply. Prompt layers: fixed facts + guardrails, then the seller's plan, then the live persona.</div></div>
+        <div class="step"><div class="n live">6</div><div><b>Bulbul v3</b> speaks it with speaker, pace, expressiveness and language from the live persona. Sentences are synthesized in parallel.</div></div>
+      </div>
+      <div class="sw" style="background:#f5f8ff;border-color:#b2ccff">🧩 <b>Distinctness across 149,363 sellers</b>: 200 distinct combinations of 9 key settings. Two random sellers differ on 3.7 of 9 settings on average. Seller types used to explain the logic: time-pressed 43% · standard 23% · new &amp; receptive 14% · guarded 12% · established/formal 5% · already engaged 2% · do-not-call 1% (no call).</div>
+      <div class="sw">⚡ Live switch: seller says <b>"kitni baar call karoge yaar, dimaag kharab mat karo"</b> → analyst <code>aggressive 0.85 escalating</code> → <b>Friendly Guide → Calm De-escalator</b> (pace 1.02 → 0.88, expressiveness 0.75 → 0.3, empathy high). Reply: <i>"माफ़ी चाहती हूँ, परेशान करने के लिए… कौन सा time सही रहेगा, या मैं call end कर दूँ?"</i> Two calm turns later → back to Friendly Guide.</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>Code: <code>python -m vani_persona.ps04.generate</code> (all sellers) · <code>…ps04.server</code> (live demo) · <code>…ps04.simulate</code> (3-seller recording)</span>
+    <span>Evidence strength: <span class="ev mod">moderate</span> CI excludes 0, n ≥ 1,000 · <span class="ev weak">weak</span> · <span class="ev guess">informed guess</span></span>
+  </div>
+</div>
+</body>
+</html>

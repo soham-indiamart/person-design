@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "event_id": "da076bd1-e124-5499-89ca-ae2ba9449f4a",
+  "call_id": "demo-call-001",
+  "session_id": "demo-session-001",
+  "seq": 17,
+  "event_type": "persona_switched",
+  "ts": "2026-10-09T08:32:35.177+00:00",
+  "turn_index": 13,
+  "experiment": {
+    "experiment_id": "demo",
+    "arm": "treatment"
+  },
+  "persona": {
+    "persona_id": "time_pressed",
+    "version": "1.0.0"
+  },
+  "payload": {
+    "turn_index": 13,
+    "seller_turn": 7,
+    "action": "switch",
+    "from_persona": "objection_raising",
+    "to_persona": "time_pressed",
+    "phase": "COMMITTED",
+    "reason": "time_pressed 0.69 beats objection_raising 0.05 by >= 0.15 for 2 evaluations",
+    "challenger": null,
+    "challenger_streak": 0,
+    "scores": {
+      "neutral_default": 0.2549,
+      "objection_raising": 0.0523,
+      "time_pressed": 0.6929
+    }
+  }
+}

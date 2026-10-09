@@ -1,0 +1,36 @@
+# Objective policy for the PS07 bot calls: VANI calls a seller (hot-lead bucket) to fix a
+# meeting with an IndiaMART executive. Steps are inferred from the data dictionary
+# (disposition / location_confirmation / se_contact evaluators).
+# APPROVED ANSWERS ARE PLACEHOLDERS: the business/compliance owner must supply the real,
+# approved wording before this policy is used for any live call.
+objective_id: fix_meeting
+version: 0.1.0
+description: >-
+  Fix an in-person or online meeting between the seller and an IndiaMART executive,
+  confirm the date/time and location, and record a callback if the seller cannot talk now.
+steps:
+  - confirm_right_person
+  - state_purpose
+  - check_existing_executive_contact
+  - propose_meeting_slot
+  - confirm_location
+  - confirm_and_close
+mandatory_disclosures:
+  - "State that VANI is an automated assistant calling from IndiaMART."
+approved_answers:
+  identity: "<TO BE SUPPLIED: approved one-line identity statement>"
+  purpose: "<TO BE SUPPLIED: why IndiaMART wants the meeting>"
+  meeting: "<TO BE SUPPLIED: what the executive meeting covers and how long it takes>"
+  cost: "<TO BE SUPPLIED: approved answer to 'is this paid?'>"
+  already_in_touch: "<TO BE SUPPLIED: what to do if the seller already works with an executive>"
+verification_route: "<TO BE SUPPLIED: how a seller can verify the call is from IndiaMART>"
+allowed_actions:
+  - fix_meeting
+  - schedule_callback
+  - end_call
+forbidden:
+  - Quoting prices, packages, discounts or offers not listed in approved_answers
+  - Recording a meeting the seller did not clearly agree to (incorrect meeting-fixed)
+  - Continuing after the seller asks not to be called
+  - Asking for OTPs, passwords or payment details
+supported_languages: [hi, en]

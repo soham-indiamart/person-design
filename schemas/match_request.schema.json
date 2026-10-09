@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/match_request.schema.json",
+  "title": "Persona match request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "call_id", "turn_index", "features", "context", "current_persona_id"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.\\d+$"},
+    "call_id": {"type": "string"},
+    "turn_index": {"type": "integer", "minimum": 0},
+    "features": {"$ref": "features.schema.json"},
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "campaign_id": {"type": ["string", "null"]},
+        "call_objective": {"type": ["string", "null"]},
+        "lead_type": {"type": ["string", "null"]},
+        "language_hint": {"type": ["string", "null"]}
+      }
+    },
+    "current_persona_id": {"type": "string"},
+    "deadline_ms": {"type": "integer", "minimum": 1, "description": "Caller gives up after this; result is then ignored"}
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/call_event.schema.json",
+  "title": "VANI persona-system call event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "call_id", "session_id", "seq", "event_type", "ts", "experiment", "persona", "payload"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.\\d+$"},
+    "event_id": {"type": "string", "format": "uuid", "description": "Deterministic from (call_id, seq, event_type); consumers dedupe on it"},
+    "call_id": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "seq": {"type": "integer", "minimum": 1, "description": "Monotonic per call; total order within the call"},
+    "event_type": {
+      "enum": ["call_started", "match_evaluated", "persona_committed", "persona_switched", "persona_reverted",
+               "style_override_applied", "opt_out_detected", "matcher_fallback", "agent_turn_composed", "call_ended"]
+    },
+    "ts": {"type": "string", "format": "date-time"},
+    "turn_index": {"type": ["integer", "null"], "minimum": 0},
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["experiment_id", "arm"],
+      "properties": {
+        "experiment_id": {"type": ["string", "null"]},
+        "arm": {"enum": ["control", "treatment", "shadow", "holdout", null]},
+        "exploration": {"type": "boolean"}
+      }
+    },
+    "persona": {
+      "type": ["object", "null"],
+      "description": "Persona ACTIVE when the event was emitted (after the change, for change events)",
+      "additionalProperties": false,
+      "required": ["persona_id", "version"],
+      "properties": {"persona_id": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "payload": {"type": "object", "description": "Event-type-specific body; never raw transcript text"}
+  }
+}

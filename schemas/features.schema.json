@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/features.schema.json",
+  "title": "Behavioural feature vector (full call or live prefix)",
+  "description": "null = not observable (e.g. no timestamps), which is different from 0. Generated from vani_persona.features.registry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "n_seller_turns"
+  ],
+  "properties": {
+    "n_seller_turns": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[context/turn_taking, reliability=high] Number of seller turns observed so far."
+    },
+    "seller_mean_tokens": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/communication_preference, reliability=medium] Mean whitespace tokens per seller turn."
+    },
+    "short_reply_ratio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[segment/turn_taking, reliability=medium] Share of seller turns with at most 3 tokens."
+    },
+    "long_reply_ratio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/engagement, reliability=medium] Share of seller turns with at least 15 tokens."
+    },
+    "question_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[segment/engagement, reliability=low] Share of seller turns that ask something ('?' or a question word)."
+    },
+    "clarification_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/communication_preference, reliability=medium] Share of seller turns asking to repeat or clarify."
+    },
+    "brevity_request_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/communication_preference, reliability=high] Share of seller turns explicitly asking VANI to be brief."
+    },
+    "time_pressure_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/engagement, reliability=medium] Share of seller turns stating they are busy / want a later call."
+    },
+    "objection_price_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/objection, reliability=medium] Share of seller turns raising cost/fees."
+    },
+    "objection_trust_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/objection, reliability=medium] Share of seller turns questioning legitimacy (spam/fraud/who is calling)."
+    },
+    "objection_not_interested_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/objection, reliability=high] Share of seller turns stating disinterest."
+    },
+    "objection_already_have_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/objection, reliability=low] Share of seller turns saying it is already done/available."
+    },
+    "info_request_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/objection, reliability=medium] Share of seller turns asking for details to be sent (WhatsApp/email)."
+    },
+    "affirmation_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[segment/conversation_progression, reliability=medium] Share of seller turns containing an affirmation (haan/ji/ok/theek hai)."
+    },
+    "engagement_slope": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/conversation_progression, reliability=low] Linear slope of seller tokens per turn over seller turn order (tokens/turn)."
+    },
+    "response_latency_median_ms": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/speaking_pace, reliability=medium] Median gap between the end of an agent turn and the start of the next seller turn."
+    },
+    "overlap_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[detail/turn_taking, reliability=medium] Share of seller turns that start before the preceding agent turn ended (or agent turns flagged interrupted when timestamps are absent)."
+    },
+    "log_mean_tokens": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[segment/communication_preference, reliability=medium] log(1 + mean tokens per seller turn): verbosity on a scale robust to a few long monologues."
+    },
+    "resistance_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[segment/objection, reliability=medium] Share of seller turns raising ANY objection (price, trust, not interested, already have)."
+    },
+    "rush_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[segment/engagement, reliability=medium] Share of seller turns signalling time pressure or asking VANI to be brief."
+    },
+    "devanagari_ratio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[language/language, reliability=high] Share of seller letters in Devanagari script."
+    },
+    "hindi_function_ratio": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[language/language, reliability=medium] Hindi function words / (Hindi + English function words) in seller speech."
+    },
+    "code_switch_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[language/language, reliability=low] Share of seller turns containing both Hindi and English function words."
+    },
+    "duration_s": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "[context/outcome_context, reliability=high] Call duration in seconds."
+    }
+  }
+}

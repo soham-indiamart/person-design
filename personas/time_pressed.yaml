@@ -1,0 +1,82 @@
+# Data-backed CANDIDATE: segment 2 of run seg-63b6bc47e6 (docs/findings/segmentation_report.md).
+# The segment is evidence-backed. The STYLE below is a design proposal (validated: false) until
+# the human transcript review and the A/B test.
+schema_version: "1.0"
+persona_id: time_pressed
+version: 1.0.0
+name: Time-pressed / not now
+status: candidate
+audience:
+  party: seller
+  call_objectives: ["fix_meeting"]
+definition:
+  behavioural_summary: >-
+    Seller signals they cannot talk now ('abhi nahi', 'baad mein', 'busy hoon', 'time nahi').
+    58% of these calls end as callback requests. Today's style fixes a meeting in 16% (adjusted)
+    of them. Hypothesized need: get to the single ask immediately and make scheduling one easy choice.
+  distinctive_features:
+    - {feature: rush_rate, direction: high, z: 1.64}
+  evidence:
+    source: "docs/findings/segmentation_report.md run seg-63b6bc47e6 (PS07 export, Jul-Sep 2026)"
+    segment_id: 2
+    n_calls: 1417
+    share: 0.162
+    bootstrap_ari: 1.0
+    temporal_ari: 1.0
+    adjusted_outcome_rate: 0.159
+    human_review: null
+  confidence: medium
+  limitations:
+    - Being busy is a state of the moment. A seller's earlier calls do not predict it (AUC 0.53), so it is detected live, not assumed.
+    - Explicit 'be brief' requests were almost absent (0.1% of calls). The signal is time pressure, not a style request.
+    - The callback-heavy outcome is partly definitional. Converting callbacks into fixed slots is the hypothesis the A/B must test.
+style:
+  tone: brisk_professional
+  pace:
+    tts_rate: 1.06
+    pause_after_question_ms: 400
+    endpointing_patience_ms: 700
+  language:
+    policy: mirror_seller
+    register: conversational
+  opening: >-
+    One sentence: VANI from IndiaMART, the single ask (a short meeting with an executive),
+    and an immediate choice of two time options.
+  explanation:
+    max_sentences_per_turn: 1
+    density: minimal
+    check_understanding: false
+  turn_taking:
+    questions_per_turn: 1
+    question_style: choice
+    on_interruption: stop_and_yield
+  objection_handling:
+    no_time: [acknowledge, offer_callback_slot_choice, log_callback_and_close]
+    price: [acknowledge, answer_with_approved_fact_one_sentence, return_to_objective]
+    trust: [state_identity_and_purpose_one_sentence, offer_verification_route_from_policy]
+    not_interested: [acknowledge, respect_decision_and_close]
+    default: [acknowledge, answer_with_approved_fact_one_sentence, return_to_objective]
+  re_engagement: >-
+    Do not re-pitch. Offer two concrete time options for the meeting or a callback, and
+    accept the first one the seller picks.
+  example_dialogue:
+    - {speaker: seller, text: "Abhi busy hoon, baad mein baat karte hain."}
+    - {speaker: agent, text: "Ji, bas ek choice: executive aapse kal subah milein ya kal shaam?"}
+    - {speaker: seller, text: "Kal shaam."}
+    - {speaker: agent, text: "Theek hai, kal shaam ki meeting note kar li. Dhanyavaad."}
+matching:
+  segment_id: 2
+  prototype:   # from artifacts/persona_prototypes.yaml, run seg-63b6bc47e6
+    short_reply_ratio: {center: 0.3333, scale: 0.2595}
+    question_rate: {center: 0.0909, scale: 0.2118}
+    affirmation_rate: {center: 0.3333, scale: 0.2059}
+    log_mean_tokens: {center: 2.1203, scale: 0.5554}
+    resistance_rate: {center: 0.0, scale: 0.1244}
+    rush_rate: {center: 0.2222, scale: 0.1196}
+switching:
+  switch_away_signals:
+    - The seller engages at length or starts asking questions (neutral or objection_raising).
+    - The seller raises identity or trust objections (objection_raising).
+evaluation:
+  validated: false
+  notes: Segment validated statistically. Style unvalidated; human transcript review and A/B pending.

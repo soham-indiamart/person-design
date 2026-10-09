@@ -1,0 +1,16 @@
+{
+  "turn_index": 13,
+  "seller_turn": 7,
+  "action": "switch",
+  "from_persona": "objection_raising",
+  "to_persona": "time_pressed",
+  "phase": "COMMITTED",
+  "reason": "time_pressed 0.69 beats objection_raising 0.05 by >= 0.15 for 2 evaluations",
+  "challenger": null,
+  "challenger_streak": 0,
+  "scores": {
+    "neutral_default": 0.2549,
+    "objection_raising": 0.0523,
+    "time_pressed": 0.6929
+  }
+}

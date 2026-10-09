@@ -1,0 +1,84 @@
+# Data-backed CANDIDATE: segment 1 of run seg-63b6bc47e6 (docs/findings/segmentation_report.md).
+# The segment is evidence-backed. The STYLE below is a design proposal (validated: false) until
+# the human transcript review and the A/B test.
+schema_version: "1.0"
+persona_id: objection_raising
+version: 1.0.0
+name: Objection-raising / needs reassurance
+status: candidate
+audience:
+  party: seller
+  call_objectives: ["fix_meeting"]
+definition:
+  behavioural_summary: >-
+    Seller raises objections during the call: who is calling and from where (identity),
+    not interested / no need, already in touch with an executive, or whether it is paid.
+    Replies are longer and contain more questions than in other calls. Today's uniform
+    style fixes meetings in 19% (adjusted) of these calls, against 40% for receptive sellers.
+  distinctive_features:
+    - {feature: resistance_rate, direction: high, z: 1.29}
+  evidence:
+    source: "docs/findings/segmentation_report.md run seg-63b6bc47e6 (PS07 export, Jul-Sep 2026)"
+    segment_id: 1
+    n_calls: 2358
+    share: 0.270
+    bootstrap_ari: 1.0
+    temporal_ari: 1.0
+    adjusted_outcome_rate: 0.188
+    human_review: null
+  confidence: medium
+  limitations:
+    - Objection lexicons have moderate precision ('already' was ~8/12 in a spot check). A human review is pending.
+    - Objections usually appear only after VANI pitches. The matcher recall for this segment is low in the first 1-2 seller turns.
+    - A lower outcome rate is partly definitional (objections overlap with 'not interested'), so it is headroom, not proof that a style helps.
+    - GMM and k-means boundaries disagree (ARI 0.22). The segment is best read as 'raised any objection'.
+style:
+  tone: reassuring
+  pace:
+    tts_rate: 0.97
+    pause_after_question_ms: 800
+    endpointing_patience_ms: 1100
+  language:
+    policy: mirror_seller
+    register: conversational
+  opening: >-
+    Greet, say VANI is an automated assistant from IndiaMART, and name the reason for
+    the call in one sentence before asking for anything.
+  explanation:
+    max_sentences_per_turn: 2
+    density: standard
+    check_understanding: true
+  turn_taking:
+    questions_per_turn: 1
+    question_style: closed
+    on_interruption: stop_acknowledge_resume
+  objection_handling:
+    trust: [acknowledge_concern, state_identity_and_purpose, offer_verification_route_from_policy, confirm_understood]
+    already_have: [acknowledge, answer_with_approved_fact, confirm_understood, return_to_objective]
+    price: [acknowledge, answer_with_approved_fact, confirm_understood, return_to_objective]
+    not_interested: [acknowledge, ask_one_reason_once, respect_decision_and_close]
+    default: [acknowledge, answer_with_approved_fact, confirm_understood, return_to_objective]
+  re_engagement: >-
+    Restate the purpose of the meeting in one sentence from POLICY, then ask one closed
+    question. Do not repeat a point the seller already rejected.
+  example_dialogue:
+    - {speaker: seller, text: "Aap kahan se bol rahe ho? Kaun bol raha hai?"}
+    - {speaker: agent, text: "Ji, main VANI hoon, IndiaMART ki automated assistant. Aapke IndiaMART account ke silsile mein ek executive se meeting ke liye call kiya hai. Kya main thoda bata doon?"}
+    - {speaker: seller, text: "Meri pehle se baat ho chuki hai aapki team se."}
+    - {speaker: agent, text: "Accha, samajh gayi. Kya aap chahenge ki wahi executive aapse milein?"}
+matching:
+  segment_id: 1
+  prototype:   # from artifacts/persona_prototypes.yaml, run seg-63b6bc47e6
+    short_reply_ratio: {center: 0.3333, scale: 0.2595}
+    question_rate: {center: 0.2, scale: 0.2118}
+    affirmation_rate: {center: 0.3333, scale: 0.2059}
+    log_mean_tokens: {center: 2.2687, scale: 0.5554}
+    resistance_rate: {center: 0.2, scale: 0.1244}
+    rush_rate: {center: 0.0, scale: 0.1196}
+switching:
+  switch_away_signals:
+    - Objections stop and the seller starts giving short cooperative answers (back to neutral).
+    - The seller says they are busy or asks for a later call (time_pressed).
+evaluation:
+  validated: false
+  notes: Segment validated statistically. Style unvalidated; human transcript review and A/B pending.

@@ -1,0 +1,15 @@
+# Call data is personal/business data: NEVER commit it.
+data/
+*.parquet
+*.jsonl.gz
+# Generated model artifacts trained on call data
+artifacts/
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+# Historical call exports delivered in the repo root (keep out of git)
+Seller-Fit Adaptive Voice Persona - Dataset*/
+.env

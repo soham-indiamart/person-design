@@ -1,0 +1,378 @@
+{
+  "$defs": {
+    "CallContext": {
+      "description": "Metadata that may confound outcomes. Never used to define personas.",
+      "properties": {
+        "campaign_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Campaign Id"
+        },
+        "call_objective": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Call Objective"
+        },
+        "lead_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Lead bucket known before dialing (lead quality confounder)",
+          "title": "Lead Type"
+        },
+        "seller_category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seller Category"
+        },
+        "language_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language Hint"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "agent_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Version"
+        },
+        "script_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Script Version"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        }
+      },
+      "title": "CallContext",
+      "type": "object"
+    },
+    "DataQuality": {
+      "properties": {
+        "has_timestamps": {
+          "default": false,
+          "title": "Has Timestamps",
+          "type": "boolean"
+        },
+        "has_asr_confidence": {
+          "default": false,
+          "title": "Has Asr Confidence",
+          "type": "boolean"
+        },
+        "mean_asr_confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mean Asr Confidence"
+        },
+        "redactions_applied": {
+          "default": 0,
+          "title": "Redactions Applied",
+          "type": "integer"
+        },
+        "unknown_speaker_turns": {
+          "default": 0,
+          "title": "Unknown Speaker Turns",
+          "type": "integer"
+        }
+      },
+      "title": "DataQuality",
+      "type": "object"
+    },
+    "DispositionClass": {
+      "description": "Normalized disposition. The raw disposition string is always kept as well.",
+      "enum": [
+        "objective_completed",
+        "callback_requested",
+        "not_interested",
+        "opt_out",
+        "seller_hung_up",
+        "no_response",
+        "wrong_party",
+        "technical_failure",
+        "other"
+      ],
+      "title": "DispositionClass",
+      "type": "string"
+    },
+    "Outcome": {
+      "properties": {
+        "disposition_raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disposition Raw"
+        },
+        "disposition_class": {
+          "$ref": "#/$defs/DispositionClass",
+          "default": "other"
+        },
+        "objective_achieved": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Objective Achieved"
+        },
+        "downstream_conversion": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Downstream Conversion"
+        },
+        "termination_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Termination Reason"
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At"
+        }
+      },
+      "title": "Outcome",
+      "type": "object"
+    },
+    "Speaker": {
+      "enum": [
+        "agent",
+        "seller",
+        "unknown"
+      ],
+      "title": "Speaker",
+      "type": "string"
+    },
+    "Turn": {
+      "properties": {
+        "idx": {
+          "description": "0-based position in the call",
+          "minimum": 0,
+          "title": "Idx",
+          "type": "integer"
+        },
+        "speaker": {
+          "$ref": "#/$defs/Speaker"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "start_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Ms"
+        },
+        "end_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Ms"
+        },
+        "asr_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asr Confidence"
+        },
+        "interrupted": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interrupted"
+        }
+      },
+      "required": [
+        "idx",
+        "speaker",
+        "text"
+      ],
+      "title": "Turn",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "call_id": {
+      "title": "Call Id",
+      "type": "string"
+    },
+    "seller_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Pseudonymized seller identifier (salted hash), never the raw ID",
+      "title": "Seller Key"
+    },
+    "context": {
+      "$ref": "#/$defs/CallContext"
+    },
+    "turns": {
+      "items": {
+        "$ref": "#/$defs/Turn"
+      },
+      "title": "Turns",
+      "type": "array"
+    },
+    "outcome": {
+      "$ref": "#/$defs/Outcome"
+    },
+    "quality": {
+      "$ref": "#/$defs/DataQuality"
+    }
+  },
+  "required": [
+    "call_id"
+  ],
+  "title": "CallRecord",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/canonical_call.schema.json"
+}

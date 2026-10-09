@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vani.internal/schemas/outcome.schema.json",
+  "title": "Call outcome submission",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "outcome_id", "call_id", "outcome_type", "value", "source", "observed_at"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.\\d+$"},
+    "outcome_id": {"type": "string", "format": "uuid", "description": "Deterministic from (call_id, outcome_type, source): resubmission is idempotent"},
+    "call_id": {"type": "string", "minLength": 1},
+    "outcome_type": {"enum": ["disposition", "objective_achieved", "downstream_conversion", "callback_honoured", "complaint", "human_review"]},
+    "value": {"type": ["string", "boolean", "number", "object"]},
+    "source": {"type": "string", "description": "System or reviewer role that produced the outcome, e.g. 'telephony', 'crm', 'qa_review'"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "supersedes": {"type": ["string", "null"], "description": "outcome_id this record corrects"},
+    "details": {"type": "object"}
+  }
+}

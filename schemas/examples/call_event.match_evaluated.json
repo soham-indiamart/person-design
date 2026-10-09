@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "event_id": "7b9527b0-f31c-559d-9ca7-b52f0e69c500",
+  "call_id": "demo-call-001",
+  "session_id": "demo-session-001",
+  "seq": 16,
+  "event_type": "match_evaluated",
+  "ts": "2026-10-09T08:32:35.177+00:00",
+  "turn_index": 13,
+  "experiment": {
+    "experiment_id": "demo",
+    "arm": "treatment"
+  },
+  "persona": {
+    "persona_id": "objection_raising",
+    "version": "1.0.0"
+  },
+  "payload": {
+    "scores": {
+      "neutral_default": 0.2549,
+      "objection_raising": 0.0523,
+      "time_pressed": 0.6929
+    },
+    "best": "time_pressed",
+    "confidence": 0.6929,
+    "abstained": false,
+    "reason": "time_pressed 0.69 >= 0.6",
+    "scorer": "prototype",
+    "model_version": "prototype:objection_raising@1.0.0,time_pressed@1.0.0",
+    "latency_ms": 0.016
+  }
+}

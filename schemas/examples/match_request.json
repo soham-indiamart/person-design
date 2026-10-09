@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "call_id": "demo-call-001",
+  "turn_index": 13,
+  "features": {
+    "n_seller_turns": 3.0,
+    "seller_mean_tokens": 3.3333,
+    "short_reply_ratio": 0.3333,
+    "long_reply_ratio": 0.0,
+    "question_rate": 0.0,
+    "clarification_rate": 0.0,
+    "brevity_request_rate": 0.0,
+    "time_pressure_rate": 0.3333,
+    "objection_price_rate": 0.0,
+    "objection_trust_rate": 0.0,
+    "objection_not_interested_rate": 0.0,
+    "objection_already_have_rate": 0.0,
+    "info_request_rate": 0.0,
+    "affirmation_rate": 0.0,
+    "engagement_slope": 0.0,
+    "response_latency_median_ms": null,
+    "overlap_rate": null,
+    "log_mean_tokens": 1.4663,
+    "resistance_rate": 0.0,
+    "rush_rate": 0.3333,
+    "devanagari_ratio": 0.0,
+    "hindi_function_ratio": 1.0,
+    "code_switch_rate": 0.0,
+    "duration_s": null
+  },
+  "context": {
+    "campaign_id": "main_vani",
+    "call_objective": "fix_meeting",
+    "lead_type": "PIM"
+  },
+  "current_persona_id": "objection_raising",
+  "deadline_ms": 30
+}

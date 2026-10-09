@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "outcome_id": "83ce6a3c-eb91-50e1-9269-102047bb76e6",
+  "call_id": "demo-call-001",
+  "outcome_type": "objective_achieved",
+  "value": true,
+  "source": "crm",
+  "observed_at": "2026-10-09T10:15:00+00:00",
+  "supersedes": null,
+  "details": {
+    "objective_id": "fix_meeting",
+    "evidence": "meeting held by executive; not flagged by incorrect_mf evaluator"
+  }
+}
