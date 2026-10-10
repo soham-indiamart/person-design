@@ -30,7 +30,7 @@ from vani_persona.ps04.flows import FLOWS, buyer_spec
 from vani_persona.ps04.generator import generate
 from vani_persona.ps04.live import CallSession
 from vani_persona.ps04.live_personas import PERSONAS, starting_persona
-from vani_persona.ps04.seller_file import SAMPLE, build_spec, parse
+from vani_persona.ps04.seller_file import FORMATS, SAMPLE, build_spec, detect_format, parse
 from vani_persona.ps04.use_cases import USE_CASES, apply_use_case, resolve
 
 STATIC = Path(__file__).parent / "static"
@@ -48,13 +48,27 @@ class State:
         self.shared = json.loads(shared_p.read_text(encoding="utf-8")) if shared_p.exists() else None
         self._sellers = None
         self._lock = threading.Lock()
-        self.file_name, self.file_rows = "", {}
+        self.file_name, self.file_rows, self.file_format = "", {}, None
         if SAMPLE.exists():
             self.load_file(SAMPLE.read_bytes(), SAMPLE.name)
 
     def load_file(self, data: bytes, name: str) -> None:
         rows = parse(data, name)
+        if not rows:
+            raise ValueError("no seller rows found in the file")
         self.file_name, self.file_rows = name, {"f:" + r["_key"]: r for r in rows}
+        self.file_format = FORMATS[detect_format(data, name)]
+
+    def file_summary(self) -> dict:
+        """Cards plus how the file was read and which use case each seller was routed to."""
+        cards = self.file_cards()
+        routed: dict[str, int] = {}
+        for c in cards:
+            if c.get("use_case"):
+                routed[c["use_case"]["name"]] = routed.get(c["use_case"]["name"], 0) + 1
+        first = next((c["key"] for c in cards if c.get("use_case") and not c.get("dnc")), None)
+        return {"name": self.file_name, "format": self.file_format, "sellers": cards,
+                "routing": routed, "first_callable": first}
 
     def file_cards(self) -> list[dict]:
         ev = load_evidence()
@@ -225,7 +239,7 @@ def make_handler(state: State, password: str | None = None):
                     use_cases = [{"id": u.id, "name": u.name, "goal": u.goal, "metric": u.metric}
                                  for u in USE_CASES.values()]
                     self._json({"sellers": cards, "personas": personas, "modes": modes, "use_cases": use_cases,
-                                "file": {"name": state.file_name, "sellers": state.file_cards()},
+                                "file": state.file_summary(),
                                 "credits": sarvam.BUDGET.status(),
                                 "languages": {"speak_and_understand": sarvam.TTS_LANGUAGES,
                                               "understand_only": sarvam.STT_ONLY_LANGUAGES}})
@@ -263,8 +277,12 @@ def make_handler(state: State, password: str | None = None):
                     if q.get("sample", ["0"])[0] == "1":
                         state.load_file(SAMPLE.read_bytes(), SAMPLE.name)
                     else:
-                        state.load_file(self._body(), q.get("name", ["sellers.csv"])[0])
-                    self._json({"name": state.file_name, "sellers": state.file_cards()})
+                        try:
+                            state.load_file(self._body(), q.get("name", ["sellers.csv"])[0])
+                        except Exception as e:
+                            return self._json({"error": f"Could not read the seller file: {e}"},
+                                              HTTPStatus.BAD_REQUEST)
+                    self._json(state.file_summary())
                 elif u.path == "/api/start":
                     req = json.loads(self._body() or b"{}")
                     mode = req.get("mode") or "auto"

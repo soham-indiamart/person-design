@@ -365,6 +365,52 @@ def test_session_waits_for_unfinished_turn_then_merges(monkeypatch, tmp_path):
     assert r["nudge"] == 1 and not r["ended"]
 
 
+def test_seller_file_in_any_format_routes_to_the_same_use_cases():
+    import io
+    import json
+
+    import pandas as pd
+
+    from vani_persona.ps04.seller_file import SAMPLE, build_spec, detect_format, parse
+
+    df = pd.read_csv(SAMPLE)
+    recs = json.loads(df.to_json(orient="records"))
+
+    def routes(data: bytes, name: str) -> dict:
+        return {r["_key"]: (build_spec(r, EVIDENCE).get("use_case") or {}).get("id") for r in parse(data, name)}
+
+    want = routes(SAMPLE.read_bytes(), SAMPLE.name)
+    xlsx = io.BytesIO()
+    df.to_excel(xlsx, index=False)
+    files = {
+        "sellers.tsv": df.to_csv(sep="\t", index=False).encode(),
+        "sellers.csv": df.to_csv(sep=";", index=False).encode(),               # semicolon, wrong extension
+        "sellers.json": json.dumps(recs).encode(),
+        "export.json": json.dumps({"status": "ok", "data": {"sellers": recs}}).encode(),
+        "sellers.jsonl": "\n".join(json.dumps(r) for r in recs).encode(),
+        "sellers.txt": json.dumps(recs).encode(),                              # JSON in a .txt
+        "sellers.xlsx": xlsx.getvalue(),
+        "sellers.xml": df.to_xml(index=False, parser="etree").encode(),
+    }
+    for name, data in files.items():
+        assert routes(data, name) == want, (name, detect_format(data, name))
+    assert detect_format(files["sellers.csv"], "sellers.csv") == "delimited"
+
+    # A CRM export with its own column names and nesting still maps (one seller object is fine too).
+    crm = {"id": "9100020", "contact_name": "Arjun Nair", "company": "Malabar Spices Export",
+           "address": {"state": "Kerala", "city": "Kochi"}, "category": "Black Pepper", "call_type": "winback",
+           "churned_plan": "Leader", "churn_reason": "switched to another platform"}
+    [r] = parse(json.dumps(crm).encode(), "one.json")
+    assert r["_key"] == "9100020" and r["seller_name"] == "Arjun Nair" and r["company_name"] == "Malabar Spices Export"
+    spec = build_spec(r, EVIDENCE)
+    assert spec["use_case"]["id"] == "win_back" and spec["language"]["primary"]["value"] == "ml-IN"
+    # Different rows may use different aliases for the same field.
+    mixed = parse(json.dumps({"sellers": [crm, {"id": 502, "name": "Ravi Gupta", "state": "Uttar Pradesh"}]}).encode(),
+                  "crm.json")
+    assert [r["seller_name"] for r in mixed] == ["Arjun Nair", "Ravi Gupta"]
+    assert [r["seller_state"] for r in mixed] == ["Kerala", "Uttar Pradesh"]
+
+
 def test_cooked_seller_file_maps_every_use_case_and_archetype():
     from vani_persona.ps04.seller_file import SAMPLE, build_spec, parse
     from vani_persona.ps04.use_cases import USE_CASES

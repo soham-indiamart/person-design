@@ -51,6 +51,8 @@
   /* ---- sellers ---- */
   .upload { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px; border:1px dashed var(--line2); border-radius:10px; background:var(--acc-soft); }
   .upload .reason { flex-basis:100%; }
+  .upload .small { font-size:12px; color:var(--mute); display:flex; gap:5px; align-items:center; cursor:pointer; }
+  .upload.drag { border-color:var(--acc); background:var(--acc-soft); outline:2px solid var(--acc); }
   .search { margin:10px 0 8px; }
   .search input { width:100%; }
   .seller { cursor:pointer; border:1px solid var(--line); background:var(--card2); border-radius:10px; padding:9px 11px; margin-bottom:8px; transition:border-color .15s, transform .15s; }
@@ -204,9 +206,12 @@
       </div>
       <div class="pane on" data-g="sellers" data-t="file">
         <div class="upload">
-          <input type="file" id="sellerFile" accept=".csv,.json,.xlsx" onchange="uploadFile(this.files[0])">
+          <input type="file" id="sellerFile" accept=".csv,.tsv,.txt,.json,.jsonl,.ndjson,.xlsx,.xls,.xml" onchange="uploadFile(this.files[0])">
           <button class="sec" onclick="loadSample()">Load sample</button>
-          <div class="reason" id="fileName">CSV, JSON or XLSX · one row per seller</div>
+          <label class="small" title="After an upload, start calling the first seller with the use case detected for them">
+            <input type="checkbox" id="autoCall" checked> Auto-call after upload</label>
+          <div class="reason" id="fileName">CSV, JSON, Excel or XML · drop a file here · one seller per row</div>
+          <div class="reason" id="fileRouting"></div>
         </div>
         <div class="search"><input type="text" id="qFile" placeholder="Search sellers, use cases…" oninput="filterList('fileSellers', this.value)"></div>
         <div class="pane-body" id="fileSellers"></div>
@@ -380,7 +385,12 @@ function renderWho() {
   el.innerHTML = `<div class="av">${esc((name.trim()[0] || '?').toUpperCase())}</div><div style="min-width:0"><b>${esc(name)}</b><div class="reason clamp1" title="${esc(sub)}">${esc(sub)}</div></div>`;
 }
 function renderFile(f) {
-  document.getElementById('fileName').textContent = f.name ? `${f.name} · ${f.sellers.length} sellers` : 'CSV, JSON or XLSX · one row per seller';
+  document.getElementById('fileName').textContent = f.name
+    ? `${f.name} · ${f.format ? 'read as ' + f.format + ' · ' : ''}${f.sellers.length} sellers`
+    : 'CSV, JSON, Excel or XML · drop a file here · one seller per row';
+  const routes = Object.entries(f.routing || {});
+  document.getElementById('fileRouting').innerHTML = routes.length
+    ? 'Routed to: ' + routes.map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join(' ') : '';
   document.getElementById('nFile').textContent = f.sellers.length;
   document.getElementById('fileSellers').innerHTML = f.sellers.length ? f.sellers.map(sellerCard).join('')
     : '<div class="empty-list">No seller file yet. Upload one, or press <b>Load sample</b>.</div>';
@@ -393,7 +403,25 @@ async function uploadFile(file) {
   try {
     const f = await api('/api/upload?name=' + encodeURIComponent(file.name), {method: 'POST', body: await file.arrayBuffer()});
     renderFile(f); tab('sellers', 'file'); status('idle');
+    await autoCall(f);
   } catch (e) { status(e.message); }
+  document.getElementById('sellerFile').value = '';
+}
+async function autoCall(f) {
+  // Each seller is already routed to a use case by the server; call the first one in the file with it.
+  if (!document.getElementById('autoCall').checked || !f.first_callable || (SESSION && !ended)) return;
+  document.getElementById('mode').value = 'auto'; modeChanged();
+  document.getElementById('startPersona').value = '';
+  await pick(f.first_callable);
+  const c = CARDS[f.first_callable], uc = c && c.use_case;
+  status(`calling ${sellerName(c, f.first_callable)}${uc ? ' · ' + uc.name : ''}…`, 'thinking');
+  await startCall();
+}
+function dropZone() {
+  const z = document.querySelector('.upload');
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('drag'); });
+  z.addEventListener('dragleave', () => z.classList.remove('drag'));
+  z.addEventListener('drop', e => { e.preventDefault(); z.classList.remove('drag'); if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
 }
 async function loadSample() {
   try { renderFile(await api('/api/upload?sample=1', {method: 'POST'})); tab('sellers', 'file'); } catch (e) { status(e.message); }
@@ -760,6 +788,7 @@ function toWav(bufs, inRate) {
   return new Blob([buf], {type: 'audio/wav'});
 }
 loadSellers();
+dropZone();
 </script>
 </body>
 </html>
