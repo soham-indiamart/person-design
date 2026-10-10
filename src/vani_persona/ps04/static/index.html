@@ -5,107 +5,174 @@
 <title>VANI · Seller-fit adaptive persona (Sarvam)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --mute:#667085; --line:#e4e7ec; --acc:#2f6fed; --hot:#e8590c; --ok:#12866b; }
+  :root {
+    --bg:#08110e; --bg2:#0c1814; --card:#0f1d18; --card2:#13241e; --ink:#e8f3ee; --mute:#8ba79b; --line:#1d3a30;
+    --acc:#34d399; --acc-ink:#04140d; --acc-soft:#34d39922; --hot:#fbbf24; --ok:#34d399; --bad:#f87171;
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; background:var(--bg); color:var(--ink); }
-  header { padding:12px 20px; background:#101828; color:#fff; display:flex; align-items:center; gap:16px; }
-  header h1 { font-size:17px; margin:0; font-weight:600; }
-  header .sub { color:#98a2b3; font-size:12px; }
-  main { display:grid; grid-template-columns: 300px 1fr 400px; gap:14px; padding:14px; height: calc(100vh - 54px); }
-  .col { display:flex; flex-direction:column; gap:12px; min-height:0; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  html { color-scheme: dark; }
+  body { margin:0; font:14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; background:var(--bg); color:var(--ink); }
+  ::-webkit-scrollbar { width:8px; height:8px; } ::-webkit-scrollbar-thumb { background:#1f3d33; border-radius:8px; }
+
+  header { padding:12px 22px; background:var(--bg2); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  header .logo { width:30px; height:30px; border-radius:8px; background:var(--acc); color:var(--acc-ink); display:grid; place-items:center; font-weight:800; font-family:var(--mono); }
+  header h1 { font-size:17px; margin:0; font-weight:700; letter-spacing:-.01em; }
+  header h1 em { color:var(--acc); font-style:normal; }
+  header .sub { color:var(--mute); font-size:12px; }
+  header #credits { margin-left:auto; font-family:var(--mono); font-size:11.5px; border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
+
+  main { display:grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) minmax(320px, 420px); gap:16px; padding:16px; height: calc(100vh - 58px); }
+  .col { display:flex; flex-direction:column; gap:14px; min-height:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .card.hero { border-color:#2a5a49; background:linear-gradient(180deg, #11241d, var(--card)); }
   .scroll { overflow:auto; min-height:0; }
-  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--mute); margin:0 0 8px; }
-  .seller { cursor:pointer; border:1px solid var(--line); border-radius:8px; padding:9px; margin-bottom:8px; }
-  .seller:hover { border-color:var(--acc); }
-  .seller.sel { border-color:var(--acc); box-shadow:0 0 0 2px #2f6fed33; }
+  h2 { font:600 11.5px/1.3 var(--mono); text-transform:uppercase; letter-spacing:.14em; color:var(--acc); margin:0 0 10px; }
+  .card.hero h2 { font-size:12.5px; }
+  .eyebrow { display:inline-block; font:600 10.5px var(--mono); letter-spacing:.12em; color:var(--acc); border:1px solid #2a5a49; background:var(--acc-soft); border-radius:4px; padding:2px 7px; margin-bottom:8px; }
+
+  .seller { cursor:pointer; border:1px solid var(--line); background:var(--card2); border-radius:10px; padding:10px 11px; margin-bottom:9px; transition:border-color .15s, transform .15s; }
+  .seller:hover { border-color:#2f7d62; transform:translateY(-1px); }
+  .seller.sel { border-color:var(--acc); box-shadow:0 0 0 2px var(--acc-soft); }
   .seller b { text-transform:capitalize; }
   .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-  .chip { font-size:11px; background:#eef2ff; color:#3538cd; border-radius:10px; padding:1px 7px; }
-  .chip.changed { background:#fff1e6; color:var(--hot); font-weight:600; }
-  #chat { flex:1; }
-  .msg { max-width:80%; padding:8px 11px; border-radius:12px; margin:6px 0; white-space:pre-wrap; }
-  .bot { background:#eef4ff; margin-right:auto; border-bottom-left-radius:3px; }
-  .you { background:#ecfdf3; margin-left:auto; border-bottom-right-radius:3px; }
+  .chip { font-size:11px; background:#16302a; color:#a7f3d0; border:1px solid #1f4a3c; border-radius:999px; padding:1px 8px; }
+  .chip.changed { background:#3a2a07; color:var(--hot); border-color:#5c430c; font-weight:600; }
+  .chip.done { background:#0f3b2b; color:var(--acc); border-color:#2a6b52; }
+
+  #chat { flex:1; min-height:240px; padding-right:4px; }
+  .msg { max-width:80%; padding:9px 12px; border-radius:14px; margin:7px 0; white-space:pre-wrap; border:1px solid transparent; }
+  .bot { background:#132a23; border-color:#1f4337; margin-right:auto; border-bottom-left-radius:4px; }
+  .you { background:#1b2f45; border-color:#27425f; margin-left:auto; border-bottom-right-radius:4px; }
   .msg .meta { font-size:11px; color:var(--mute); margin-top:3px; }
-  .sw { margin:6px auto; font-size:12px; background:#fff7ed; border:1px dashed #fdba74; border-radius:8px; padding:5px 9px; max-width:90%; }
+  .msg.pending { opacity:.65; border:1px dashed var(--acc); }
+  .sw { margin:7px auto; font-size:12px; background:#2a2108; border:1px dashed #6b5312; border-radius:10px; padding:6px 10px; max-width:92%; }
+
   .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  button { border:0; border-radius:8px; padding:8px 13px; font-weight:600; cursor:pointer; background:var(--acc); color:#fff; }
-  button.sec { background:#eaecf0; color:var(--ink); }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  #status { font-weight:600; }
-  #status.listening { color:var(--ok); } #status.thinking { color:#b54708; } #status.speaking { color:var(--acc); }
-  .meter { width:120px; height:8px; background:#eaecf0; border-radius:4px; overflow:hidden; }
+  button { border:0; border-radius:8px; padding:8px 14px; font-weight:700; cursor:pointer; background:var(--acc); color:var(--acc-ink); transition:filter .15s; }
+  button:hover:not(:disabled) { filter:brightness(1.1); }
+  button.sec { background:transparent; color:var(--ink); border:1px solid #2a5a49; }
+  button.sec:hover:not(:disabled) { background:var(--acc-soft); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  #status { font:600 12px var(--mono); padding:3px 9px; border-radius:999px; border:1px solid var(--line); }
+  #status.listening { color:var(--ok); border-color:#2a6b52; } #status.thinking { color:var(--hot); border-color:#5c430c; } #status.speaking { color:#93c5fd; border-color:#27425f; }
+  .meter { width:110px; height:8px; background:#16302a; border-radius:4px; overflow:hidden; }
   .meter > div { height:100%; width:0; background:var(--ok); transition:width .08s; }
-  input[type=text] { flex:1; padding:8px; border:1px solid var(--line); border-radius:8px; min-width:120px; }
+  input[type=text], select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg2); color:var(--ink); font:inherit; }
+  input[type=text] { flex:1; min-width:120px; }
+  input[type=text]:focus, select:focus { outline:none; border-color:var(--acc); }
+  input[type=file] { color:var(--mute); font-size:12px; max-width:100%; }
+  input[type=file]::file-selector-button { background:var(--acc); color:var(--acc-ink); border:0; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; margin-right:8px; }
+  input[type=checkbox] { accent-color:var(--acc); }
+  label { color:var(--mute); font-size:12.5px; }
+
   table { width:100%; border-collapse:collapse; font-size:12px; }
-  td, th { border-bottom:1px solid var(--line); padding:5px 4px; text-align:left; vertical-align:top; }
-  th { color:var(--mute); font-weight:600; }
+  td, th { border-bottom:1px solid var(--line); padding:6px 4px; text-align:left; vertical-align:top; }
+  th { color:var(--mute); font-weight:600; font-family:var(--mono); font-size:11px; }
   .kv { display:grid; grid-template-columns: 110px 1fr; gap:3px 8px; font-size:12.5px; }
   .kv .k { color:var(--mute); }
   .kv .v.changed { color:var(--hot); font-weight:700; }
   details summary { cursor:pointer; color:var(--acc); font-weight:600; }
-  pre { font-size:11px; white-space:pre-wrap; max-height:340px; overflow:auto; background:#f9fafb; padding:8px; border-radius:6px; }
+  details.fold > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; font:600 11.5px var(--mono); text-transform:uppercase; letter-spacing:.14em; }
+  details.fold > summary::-webkit-details-marker { display:none; }
+  details.fold > summary::after { content:"＋"; color:var(--mute); }
+  details.fold[open] > summary::after { content:"－"; }
+  details.fold[open] > summary { margin-bottom:10px; }
+  pre { font-size:11px; white-space:pre-wrap; max-height:340px; overflow:auto; background:var(--bg2); padding:8px; border-radius:6px; }
   .reason { color:var(--mute); font-size:11.5px; }
-  .tag { display:inline-block; font-size:10.5px; padding:0 5px; border-radius:4px; background:#f2f4f7; color:#344054; }
-  .badge { border-radius:10px; padding:10px 12px; color:#fff; background:#2f6fed; transition:background .3s; }
-  .badge .nm { font-size:20px; font-weight:700; }
+  .tag { display:inline-block; font-size:10.5px; padding:0 6px; border-radius:4px; background:#1a2c27; color:#c5d9d0; border:1px solid var(--line); }
+  .tag.moderate { background:#0f3b2b; color:var(--acc); border-color:#2a6b52; }
+  .tag.weak { background:#3a2a07; color:var(--hot); border-color:#5c430c; }
+  .tag.informed_guess, .tag.inconclusive { background:#1a2c27; color:var(--mute); }
+  .pill { display:inline-block; color:#fff; border-radius:999px; padding:0 8px; font-weight:600; }
+
+  .badge { border-radius:12px; padding:12px 14px; color:#fff; background:#2f6fed; transition:background .3s; box-shadow: inset 0 0 0 1px #ffffff22; }
+  .badge .nm { font-size:20px; font-weight:800; }
   .badge .ds { font-size:12px; opacity:.92; }
   .badge.flash { animation: flash 1s ease 2; }
-  @keyframes flash { 50% { transform: scale(1.03); box-shadow:0 0 0 4px #fdba7466; } }
-  .tl { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; align-items:center; font-size:11.5px; }
-  .tl span.p { color:#fff; border-radius:10px; padding:1px 8px; }
-  .bar { height:7px; background:#eaecf0; border-radius:4px; overflow:hidden; margin:3px 0 6px; }
-  .bar > div { height:100%; background:#e8590c; }
-  .pcat { display:grid; grid-template-columns: 12px 1fr; gap:4px 8px; font-size:12px; align-items:start; }
+  @keyframes flash { 50% { transform: scale(1.03); box-shadow:0 0 0 4px #34d39966; } }
+  .tl { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; align-items:center; font-size:11.5px; color:var(--mute); }
+  .tl span.p { color:#fff; border-radius:999px; padding:1px 8px; }
+  .bar { height:7px; background:#16302a; border-radius:4px; overflow:hidden; margin:3px 0 6px; }
+  .bar > div { height:100%; background:var(--acc); }
+  .pcat { display:grid; grid-template-columns: 12px 1fr; gap:5px 8px; font-size:12px; align-items:start; }
   .pcat i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-top:4px; }
   .plabel { font-size:15px; font-weight:700; color:var(--ink); }
-  select { padding:6px; border:1px solid var(--line); border-radius:8px; font:inherit; }
-  .stages { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11.5px; }
-  .stage { border:1px solid var(--line); border-radius:10px; padding:1px 8px; color:var(--mute); }
-  .stage.done { background:#ecfdf3; color:#067647; border-color:#abefc6; }
-  .stage.now { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:600; }
-  .msg.pending { opacity:.6; border:1px dashed #12866b; }
-  .tag.moderate { background:#ecfdf3; color:#067647; } .tag.weak { background:#fffaeb; color:#b54708; } .tag.informed_guess, .tag.inconclusive { background:#f2f4f7; color:#475467; }
+  .stages { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11.5px; color:var(--mute); }
+  .stage { border:1px solid var(--line); border-radius:999px; padding:1px 9px; color:var(--mute); }
+  .stage.done { background:#0f3b2b; color:var(--acc); border-color:#2a6b52; }
+  .stage.now { background:var(--acc); color:var(--acc-ink); border-color:var(--acc); font-weight:700; }
+
+  /* left column: the two seller lists get the room */
+  #fileCard { flex:3 1 0; min-height:280px; }
+  #demoCard { flex:2 1 0; min-height:200px; }
+
+  /* Laptop: narrower side columns */
+  @media (max-width: 1380px) {
+    main { grid-template-columns: minmax(270px, 310px) minmax(0, 1fr) minmax(300px, 360px); gap:12px; padding:12px; }
+  }
+  /* Tablet: seller lists + call on top, insights below; the page scrolls */
+  @media (max-width: 1100px) {
+    main { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); height:auto; }
+    main > section:nth-child(3) { grid-column: 1 / -1; display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    main > section:nth-child(3) > .card { min-height:0; }
+    .col { min-height:auto; }
+    #fileCard, #demoCard { flex:none; max-height:52vh; }
+    #callCard { min-height:78vh; }
+  }
+  /* Phone: one column */
+  @media (max-width: 760px) {
+    header { padding:10px 14px; } header .sub.flow { display:none; }
+    header #credits { margin-left:0; max-width:100%; white-space:normal; }
+    main { grid-template-columns: minmax(0, 1fr); padding:10px; }
+    .card, .seller, .col { min-width:0; }
+    .reason, .seller, .msg, td { overflow-wrap:anywhere; }
+    .controls > input[type=text] { min-width:0; }
+    main > section:nth-child(3) { grid-template-columns: minmax(0, 1fr); }
+    select { max-width:100%; min-width:0; }
+    label { max-width:100%; }
+    #callCard { min-height:70vh; }
+    .msg { max-width:92%; }
+    .meter { width:70px; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>VANI · Seller-fit adaptive persona</h1>
-  <span class="sub">Saaras speech-to-text → turn-taking gate → Behaviour Analyst + live caller profile → Persona Director → call flow → Sarvam LLM → Bulbul voice (streamed)</span>
-  <span class="sub" id="credits" style="margin-left:auto"></span>
+  <div class="logo">V</div>
+  <h1>VANI <em>Persona</em></h1>
+  <span class="sub flow">Saaras STT → turn-taking → Behaviour Analyst + live profile → Persona Director → call flow → Sarvam LLM → Bulbul (streamed)</span>
+  <span class="sub" id="credits"></span>
 </header>
 <main>
   <section class="col">
-    <div class="card scroll" style="flex:1.4">
+    <div class="card hero scroll" id="fileCard">
+      <span class="eyebrow">START HERE</span>
       <h2>1 · Seller data file</h2>
       <div class="controls">
-        <input type="file" id="sellerFile" accept=".csv,.json,.xlsx" onchange="uploadFile(this.files[0])" style="max-width:190px">
+        <input type="file" id="sellerFile" accept=".csv,.json,.xlsx" onchange="uploadFile(this.files[0])">
         <button class="sec" onclick="loadSample()">Load sample</button>
       </div>
-      <div class="reason" id="fileName" style="margin:4px 0 6px"></div>
+      <div class="reason" id="fileName" style="margin:6px 0 8px"></div>
       <div id="fileSellers"></div>
     </div>
-    <div class="card scroll" style="flex:1">
-      <h2>or a PS07 sample seller</h2>
+    <div class="card hero scroll" id="demoCard">
+      <h2>Or a PS07 sample seller</h2>
       <div id="sellers"></div>
       <div class="controls" style="margin-top:6px">
-        <input type="text" id="sellerId" placeholder="or any seller id from the file">
+        <input type="text" id="sellerId" placeholder="any seller id from the PS07 file">
         <button class="sec" onclick="pickCustom()">Load</button>
       </div>
     </div>
-    <div class="card">
-      <h2>Live personas (chosen during the call)</h2>
+    <details class="card fold">
+      <summary>Personas &amp; languages</summary>
       <div class="pcat" id="pcat"></div>
-    </div>
-    <div class="card">
-      <h2>Languages</h2>
-      <div class="reason" id="langs"></div>
-    </div>
+      <div class="reason" id="langs" style="margin-top:10px"></div>
+    </details>
   </section>
 
   <section class="col">
-    <div class="card" style="display:flex; flex-direction:column; flex:1; min-height:0">
+    <div class="card" id="callCard" style="display:flex; flex-direction:column; flex:1; min-height:0">
       <h2>2 · Live call</h2>
       <div class="controls" style="margin-bottom:6px">
         <label class="reason">use case <select id="mode" onchange="modeChanged()">
@@ -246,8 +313,8 @@ function renderFlow(f) {
   const notes = Object.entries(f.notes || {});
   const ck = (f.checklist || []);
   const checklist = ck.length ? `<div style="margin-top:8px"><b>Checklist</b> ${f.progress ? `${f.progress.done}/${f.progress.total}` : ''}
-      <div class="bar"><div style="width:${f.progress ? 100 * f.progress.done / f.progress.total : 0}%;background:#12866b"></div></div>
-      <div class="chips">${ck.map(c => `<span class="chip" style="${(f.notes || {})[c.key] ? 'background:#ecfdf3;color:#067647' : ''}">${(f.notes || {})[c.key] ? '✓ ' : ''}${esc(c.label)}</span>`).join('')}</div></div>` : '';
+      <div class="bar"><div style="width:${f.progress ? 100 * f.progress.done / f.progress.total : 0}%"></div></div>
+      <div class="chips">${ck.map(c => `<span class="chip ${(f.notes || {})[c.key] ? 'done' : ''}">${(f.notes || {})[c.key] ? '✓ ' : ''}${esc(c.label)}</span>`).join('')}</div></div>` : '';
   document.getElementById('flow').innerHTML = (f.goal ? `<div class="reason" style="margin-bottom:6px">${f.archetype ? '<b>' + esc(f.archetype) + '</b> · ' : ''}${esc(f.goal)}</div>` : '') +
     `<div class="stages">${stages}</div>` + checklist +
     (notes.length ? `<div class="kv" style="margin-top:8px">${notes.map(([k, v]) => `<div class="k">${esc(k.replace(/_/g, ' '))}</div><div class="v">${esc(v)}</div>`).join('')}</div>`
@@ -306,7 +373,7 @@ function addSwitches(list) {
   const c = document.getElementById('chat'), log = document.getElementById('log');
   for (const e of list) {
     const ch = Object.entries(e.change).filter(([k]) => k !== 'focus').map(([k, v]) => `${k}: ${v[0]} → ${v[1]}`).join(', ') || '—';
-    const what = e.type === 'persona' ? `<b style="color:${pcol(e.from_persona)}">${esc(e.from_name)}</b> → <b style="color:${pcol(e.to_persona)}">${esc(e.to_name)}</b>`
+    const what = e.type === 'persona' ? `<span class="pill" style="background:${pcol(e.from_persona)}">${esc(e.from_name)}</span> → <span class="pill" style="background:${pcol(e.to_persona)}">${esc(e.to_name)}</span>`
                : e.type === 'language' ? `<b>language</b> ${esc(LANGS[(e.change.language || [])[0]] || (e.change.language || [])[0] || '')} → ${esc(LANGS[(e.change.language || [])[1]] || (e.change.language || [])[1] || 'Hindi (no voice)')}`
                : e.type === 'profile' ? `<b>live profile</b>`
                : `<b>escalation</b>`;
@@ -328,7 +395,7 @@ function renderAnalyst(a, d) {
   const p = Object.values(PERSONAS).find(x => x.state === a.state);
   const col = p ? p.colour : '#667085';
   document.getElementById('analyst').innerHTML =
-    `seller is <b style="color:${col}">${esc(a.state)}</b> · intensity ${a.intensity.toFixed(2)} · ${esc(a.trend)} · <i>${esc(a.source)}</i>
+    `seller is <span class="pill" style="background:${col}">${esc(a.state)}</span> · intensity ${a.intensity.toFixed(2)} · ${esc(a.trend)} · <i>${esc(a.source)}</i>
      <div class="bar"><div style="width:${a.intensity * 100}%;background:${col}"></div></div>
      ${a.evidence ? '“' + esc(a.evidence) + '” — ' : ''}${esc(a.rationale)}<br><b>Director:</b> ${esc(d ? d.action : '')} — ${esc(d ? d.reason : '')}`;
 }
@@ -417,7 +484,7 @@ async function streamApi(path, opts) {
 function showCredits(c) {
   const el = document.getElementById('credits');
   el.textContent = `Sarvam credits used (estimate): ${c.spent_estimate} / ${c.limit} · ${c.remaining} left`;
-  el.style.color = c.remaining < 0.15 * c.limit ? '#b42318' : '';
+  el.style.color = c.remaining < 0.15 * c.limit ? 'var(--bad)' : '';
 }
 function timingText(t) { if (!t) return ''; return Object.entries(t).filter(([k]) => k.endsWith('_ms')).map(([k, v]) => `${k.replace('_ms','')} ${v} ms`).join(' · '); }
 

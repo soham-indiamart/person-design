@@ -1,0 +1,18 @@
+fk_glusr_usr_id,seller_city,seller_state,business_type,annual_turnover,nature_of_business,gst_registration_year,top_category_1,top_category_group,use_case,seller_name,company_name,profile_missing_fields,enquiry_product,enquiry_quantity,enquiry_buyer_city,enquiry_age_hours,unreplied_enquiries,onboarding_steps_pending,registered_days_ago,digital_experience,subscription_plan,subscription_expiry_days,enquiries_on_plan,satisfaction,renewed_before,ticket_type,ticket_summary,ticket_age_days,ticket_status,ticket_prior_contacts,listings_to_verify,catalogue_size,seller_district,seller_pincode,seller_locality,nature_of_business_secondary,top_category_2,top_category_3,top_parent_category,num_categories,eng_activity_30d,eng_answered_calls_90d,eng_call_attempts_90d,eng_call_attempts_1yr,eng_pickup_ratio_90d,eng_pickup_ratio_1yr,eng_long_calls_90d,eng_short_calls_90d,eng_callback_90d,eng_callback_1yr,eng_meetings_1yr,eng_hot_meetings_1yr,eng_enq_received_90d,eng_enq_received_1yr,eng_enq_replies_90d,eng_enq_replies_1yr,eng_pns_received_90d,eng_pns_received_1yr,eng_pns_answered_90d,eng_pns_answered_1yr,eng_ni_count_1yr,eng_np_count_1yr,eng_product_count,eng_products_modified_90d,eng_products_modified_1yr,eng_cqs,bot_attempts,bot_answered,calls_meeting_fixed,calls_not_interested,calls_general,calls_call_later,bot_answer_rate,avg_answered_call_sec,past_objections,past_questions_asked,asked_if_talking_to_bot,showed_frustration,past_dispositions_detailed,already_in_touch_with_executive,do_not_call_requested
+9100001,Lucknow,Uttar Pradesh,Proprietorship,0 - 40 L,Trader - Retailer,2019,Steel Kitchen Utensils,Kitchen Utensils,seller_enrichment,Ramesh Sharma,Sharma Bartan Bhandar,brands; service_locations; delivery_time,,,,,,,,,,,,,,,,,,,,,,,,,,,,4,10,2,4,12,0.5,0.5,1,1,0,0,0,0,8,30,4,15,3,10,2,7,0,0,20,2,6,55,3,2,0,0,1,2,0.67,19.0,Seller Unavailability & Scheduling Constraints (2),,0,0,,0,0
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
