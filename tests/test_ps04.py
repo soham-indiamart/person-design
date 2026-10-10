@@ -418,22 +418,87 @@ def test_win_back_use_case():
     assert (uc["archetype"]["id"], uc["start_persona"]) == ("burned", "empathetic_listener")
     assert any("Star, 1 year" in c for c in uc["context"]) and any("fake" in c for c in uc["context"])
     assert [c["key"] for c in uc["checklist"]][0] == "churn_reason"
-    assert "meeting" not in spec["facts"]["purpose"].lower()
+    assert "meeting" in spec["facts"]["purpose"].lower() and "11 am" in spec["facts"]["meeting_hours"]
+    assert any("reported from the app" in c for c in uc["context"])                # the fix for fake leads
+    assert {"meeting_day", "meeting_time", "meeting_mode"} <= {c["key"] for c in uc["checklist"]}
     price = apply_use_case(generate(row(), EVIDENCE), {**churned, "churn_reason": "too expensive"})
     assert price["use_case"]["archetype"]["id"] == "price"
+    assert any("plan options" in c for c in price["use_case"]["context"])
 
 
-def test_win_back_callback_implies_comeback_interest(monkeypatch, tmp_path):
+def test_instant_ack_and_no_repeats(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live, sarvam
+    from vani_persona.ps04.live import ACK_CACHE, CallSession, Turn
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    monkeypatch.setattr(live.CallSession, "warm_acks", lambda self: None)
+    s = CallSession(generate(row(), EVIDENCE))
+    lang, speaker = s._tts_args(s.settings)[:2]
+    for t in live.ACKS[lang]:
+        ACK_CACHE[(t, lang, speaker)] = b"wav"
+    seen = {}
+
+    def chat(msgs, **k):
+        if "SOUND HUMAN" in msgs[0]["content"]:          # the reply model, not the analyst
+            seen["msgs"] = msgs
+        return "अच्छा, तो कल ग्यारह बजे ठीक रहेगा? ##STAGE: meeting##", 5
+    monkeypatch.setattr(sarvam, "chat", chat)
+    heard = []
+    r = s.seller_text("haan ji bataiye kya kaam hai aapko", "hi-IN", stream=True, on_ack=lambda t, w: heard.append(t))
+    assert heard and r["ack"] == heard[0]
+    assert "already said" in seen["msgs"][-1]["content"]
+    assert not r["reply"].startswith("अच्छा")                    # no second acknowledgement
+    assert s.turns[-1].text.startswith(heard[0])                  # the history has what was actually said
+    assert s.seller_text("haan", "hi-IN", stream=True, on_ack=lambda t, w: heard.append(t))["ack"] is None
+    s.turns = [Turn("bot", "जी सर, meeting कल रख लेते हैं।"), Turn("bot", "जी सर, meeting कल रख लेते हैं ना?")]
+    hint = s._avoid_repeats()
+    assert "'जी सर'" in hint and "meeting कल रख" in hint
+
+
+def test_trim_rambling_keeps_the_point_and_question():
+    from vani_persona.ps04.live import trim_rambling
+
+    long = ("Ji, samajh gayi, ye sach mein dikkat wali baat hai. "
+            "Executive aapke liye bulk buyers ka filter laga denge aur categories bhi dekh lenge. "
+            "Kya isse aapki problem solve ho jayegi?")
+    assert trim_rambling(long, 12) == ("Executive aapke liye bulk buyers ka filter laga denge aur categories bhi dekh "
+                                       "lenge. Kya isse aapki problem solve ho jayegi?")
+    assert trim_rambling("Achha. Kal milte hain?", 18) == "Achha. Kal milte hain?"
+
+
+def test_speech_cleanup_tags_and_repeated_apology(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live
+    from vani_persona.ps04.live import CallSession, Turn, drop_repeats_once
+
+    assert drop_repeats_once("इसके लिए माफ़ी चाहती हूँ, executive filter लगा देंगे। ठीक रहेगा?",
+                             "पहले: उसके लिए माफ़ी चाहती हूँ।") == "executive filter लगा देंगे। ठीक रहेगा?"
+    assert drop_repeats_once("Sorry, kal milte hain?", "Namaste ji") == "Sorry, kal milte hain?"
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    s = CallSession(generate(row(), EVIDENCE))
+    s.turns.append(Turn("bot", "Namaste"))
+    text, _ = s._finish("Kya aap Ramesh ji bol rahe hain? NOTE: seller_name=Ramesh; city=Lucknow", 5)
+    assert "NOTE" not in text and s.flow_state["notes"]["city"] == "Lucknow"
+    text, _ = s._finish("Theek hai. ## NOTE: day=kal##", 5)
+    assert text == "Theek hai." and s.flow_state["notes"]["day"] == "kal"
+
+
+def test_win_back_books_a_meeting(monkeypatch, tmp_path):
     from vani_persona.ps04 import live, sarvam
     from vani_persona.ps04.live import CallSession
     from vani_persona.ps04.use_cases import apply_use_case
 
     monkeypatch.setattr(live, "LOG_DIR", tmp_path)
-    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (
-        "Theek hai, kal 5 baje call aayega. ##STAGE: comeback## ##NOTE: followup_time=kal 5 baje##", 5))
     s = CallSession(apply_use_case(generate(row(), EVIDENCE), {"churned_plan": "Star", "churn_reason": "too costly"}))
-    r = s.open(stream=True)
-    assert r["flow"]["notes"]["comeback_interest"].startswith("yes")
+    assert "##MEETING:" in s.system_prompt()
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (
+        "Theek hai, kal 3 baje online meeting. ##STAGE: meeting## ##MEETING: kal 3 pm online##", 5))
+    s.open(stream=True)
+    assert s.outcome["meeting"] == "kal 3 pm online"
+    s2 = CallSession(apply_use_case(generate(row(), EVIDENCE), {"churned_plan": "Star"}))
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (
+        "Theek hai. ##STAGE: meeting## ##NOTE: meeting_day=parso; meeting_time=3 pm; meeting_mode=online##", 5))
+    s2.open(stream=True)
+    assert s2.outcome["meeting"] == "parso 3 pm, online"          # booked even without the MEETING tag
 
 
 def test_use_case_session_prompt_checklist_and_rest_persona(monkeypatch, tmp_path):

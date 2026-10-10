@@ -142,9 +142,8 @@ def make_handler(state: State):
                 r["audio"] = base64.b64encode(r["audio"]).decode()
             return r
 
-        def _stream(self, s: CallSession, r: dict, extra: dict | None = None):
-            """NDJSON: the turn (text, analysis, switches, profile) at once, then each sentence's audio
-            as soon as it is synthesised, so the browser starts playing the first sentence early."""
+        def _stream_start(self):
+            """Open an NDJSON response; returns ``send(obj)``."""
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
             self.send_header("Cache-Control", "no-cache")
@@ -155,7 +154,12 @@ def make_handler(state: State):
             def send(obj):
                 self.wfile.write(json.dumps(obj, ensure_ascii=False, default=str).encode("utf-8") + b"\n")
                 self.wfile.flush()
+            return send
 
+        def _stream(self, s: CallSession, r: dict, extra: dict | None = None, send=None):
+            """NDJSON: the turn (text, analysis, switches, profile) at once, then each sentence's audio
+            as soon as it is synthesised, so the browser starts playing the first sentence early."""
+            send = send or self._stream_start()
             try:
                 send({"type": "turn", **(extra or {}), **self._out(r)})
                 if r.get("skipped") or not r.get("reply"):
@@ -257,21 +261,44 @@ def make_handler(state: State):
                     flags = {k for k in ("interrupted", "nudge", "flush") if q.get(k, ["0"])[0] == "1"}
                     ctype = self.headers.get("Content-Type", "")
                     body = self._body()
-                    with s.lock:
-                        if "interrupted" in flags:
-                            s.mark_interrupted()
-                        if "nudge" in flags:
-                            r = s.nudge(stream=stream)
-                        elif "flush" in flags:
-                            r = s.flush(stream=stream)
-                        elif ctype.startswith("application/json"):
-                            req = json.loads(body)
-                            r = s.seller_text(req["text"], req.get("language"), stream=stream,
-                                              hold_if_unfinished=bool(req.get("hold", False)))
-                        else:
-                            r = s.seller_audio(body, ctype or "audio/wav", stream=stream)
+                    send, on_ack = None, None
                     if stream:
-                        return self._stream(s, r)
+                        # Start the response now: an instant "achha" plays while the reply is written.
+                        send = self._stream_start()
+
+                        def on_ack(text, wav):
+                            try:
+                                send({"type": "audio", "i": -1, "ack": text, "audio": base64.b64encode(wav).decode()})
+                            except OSError:
+                                pass   # the browser hung up; the turn still completes for the log
+                    try:
+                        with s.lock:
+                            if "interrupted" in flags:
+                                s.mark_interrupted()
+                            if "nudge" in flags:
+                                r = s.nudge(stream=stream)
+                            elif "flush" in flags:
+                                r = s.flush(stream=stream, on_ack=on_ack)
+                            elif ctype.startswith("application/json"):
+                                req = json.loads(body)
+                                r = s.seller_text(req["text"], req.get("language"), stream=stream,
+                                                  hold_if_unfinished=bool(req.get("hold", False)), on_ack=on_ack)
+                            else:
+                                r = s.seller_audio(body, ctype or "audio/wav", stream=stream, on_ack=on_ack)
+                    except Exception as e:
+                        if not send:
+                            raise
+                        import traceback
+                        traceback.print_exc()
+                        msg = f"Sarvam: {e}" if isinstance(e, sarvam.SarvamError) else str(e)
+                        try:
+                            send({"type": "error", "error": msg})
+                            send({"type": "done"})
+                        except OSError:
+                            pass
+                        return
+                    if stream:
+                        return self._stream(s, r, send=send)
                     self._json(self._out(r))
                 else:
                     self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)

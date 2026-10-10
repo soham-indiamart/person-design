@@ -163,8 +163,8 @@ ENRICHMENT = UseCase(
                  "helps more relevant buyers find them. Ask if two minutes is fine."),
                 ("collect", "Collect details", "Go through the checklist one item per question. Capture numbers with "
                  "units. If they give several details at once, capture all of them."),
-                ("verify", "Verify", "Read back only numbers or spellings that are easy to get wrong (MOQ, capacity, "
-                 "brand names) in one short sentence."),
+                ("verify", "Verify", "Only if a number or brand spelling was unclear, read it back once in a few "
+                 "words. Approximate answers are fine; never ask them to be more exact. Usually skip this stage."),
                 CLOSE],
                ("Why do you need this: so buyers searching for their products see accurate details and contact them.",
                 "Will it cost anything: no, updating the profile is free.",
@@ -589,78 +589,111 @@ def _winback_context(row: dict) -> list[str]:
          if _num(row.get("enquiries_on_plan")) is not None else None),
         f"Now using: {row['competitor']}." if _str(row.get("competitor")) else None,
     ]
+    fixes = winback_fixes(row)
+    if fixes:
+        lines.append("How their problem can be addressed (suggest in your own words as what the executive will set up "
+                     "with them in the meeting; never promise results): " + " ".join(fixes))
     return [line for line in lines if line]
+
+
+# (words in the churn reason, the fix the executive can set up). Only real, non-price remedies.
+WINBACK_FIXES = [
+    (("irrelevant", "retail", "one piece", "single piece", "small quantit", "wrong buyer", "wrong enquir"),
+     "Lead preferences can be set by product, buyer city and minimum order quantity so retail and single-piece "
+     "enquiries are filtered out; the executive also reviews their categories so enquiries match what they sell."),
+    (("fake", "spam", "fraud", "not genuine"),
+     "Enquiries that look fake can be reported from the app so matching improves; the executive shows how to check "
+     "a buyer's details before replying."),
+    (("few enquir", "less enquir", "no enquir", "not enough", "no leads", "few leads", "no business", "no orders"),
+     "Enquiries depend on the catalogue: the executive reviews their listings (photos, prices, more products, the "
+     "right categories) so more relevant buyers find them."),
+    (("price", "cost", "expensive", "costly", "budget", "afford", "slow", "worth", "roi"),
+     "The executive goes through what the plan delivered for them and shows plan options that fit their current "
+     "budget (prices only from the executive)."),
+    (("competitor", "platform", "tradeindia", "justdial", "switched", "own website"),
+     "IndiaMART can run alongside what they use now; the executive shows the buyer demand on IndiaMART for their "
+     "category."),
+    (("service", "no response", "support", "executive", "nobody", "no one"),
+     "One executive takes ownership of their account, so they have a single person to go to."),
+]
+
+
+def winback_fixes(row: dict) -> list[str]:
+    why = (_str(row.get("churn_reason")) or "").lower() + " " + (_str(row.get("competitor")) or "").lower()
+    fixes = [fix for words, fix in WINBACK_FIXES if any(w in why for w in words)]
+    return fixes or ["The executive reviews their account with them and shows what would fit their business now."]
 
 
 WINBACK = UseCase(
     id="win_back", name="Win back a churned seller",
-    goal="Reconnect with a seller who left their paid IndiaMART plan, understand honestly why they left, and find "
-         "out what would bring them back.",
-    metric="Churn reasons captured, sellers open to an account-manager callback, and win-back conversion.",
-    ask="a few minutes to hear why they left", benefit="buyers are still searching IndiaMART for what they sell",
-    facts=_facts("Payal is calling a seller who used to have a paid IndiaMART plan, to understand why they left and "
-                 "whether anything would make it worth coming back.",
-                 "If they are open to it, an IndiaMART account manager calls them with suitable plan options; their "
-                 "free listing stays active either way.",
-                 {"plan_rule": "Payal may mention the old plan name and their enquiry numbers from the call context, "
+    goal="Reconnect with a seller who left their paid IndiaMART plan, understand why they left, suggest how that "
+         "problem can be solved, and book a meeting with an IndiaMART executive to set it up.",
+    metric="Churn reasons captured, win-back meetings booked (and attended), and win-back conversion.",
+    ask="a short meeting to fix what went wrong", benefit="buyers are still searching IndiaMART for what they sell",
+    facts=_facts("Payal is calling a seller who used to have a paid IndiaMART plan, to understand why they left, "
+                 "suggest how that can be fixed, and set up a short meeting with an IndiaMART executive.",
+                 "A short meeting with an IndiaMART executive (visit or online) to go through their problem and set "
+                 "up the fix; their free listing stays active either way.",
+                 {"meeting_modes": MEETING_FACTS["meeting_modes"], "meeting_hours": MEETING_FACTS["meeting_hours"],
+                  "plan_rule": "Payal may mention the old plan name and their enquiry numbers from the call context, "
                                "never prices, discounts or offers.",
-                  "tone_rule": "This is not a sales call: listening and the honest reason matter more than a yes.",
                   "apology_rule": "Apologise at most once in the whole call, and only after the seller has described "
                                   "the problem; if you already apologised (see the history), acknowledge without "
                                   "saying sorry again."}),
     flow=_flow("win_back", "Win-back",
                "You are Payal, IndiaMART's voice assistant, calling a seller who had a paid IndiaMART plan and left. "
-               "Thank them for having been with IndiaMART, understand honestly why they left, and find out what would "
-               "bring them back. Never sound desperate and never pressure.",
+               "Understand why they left, show them how that problem can be solved, and book a short meeting with an "
+               "IndiaMART executive to set it up. Confident and helpful, never desperate or pushy.",
                [IDENTIFY,
                 ("reconnect", "Reconnect", "Thank them for having been a paid IndiaMART member and mention the plan "
                  "from the call context in one line. No pitch and no apology yet."),
                 ("reason", "Why they left", "If a reason is in the call context, confirm it in their words ('aapne "
-                 "bataya tha leads relevant nahi the, sahi?') instead of asking cold; otherwise ask openly."),
-                ("what_changed", "What would change it", "Ask what would have to be different for IndiaMART to be "
-                 "worth it again. Relate it to their own numbers; note complaints for the account manager."),
-                ("comeback", "Open to coming back", "Ask if they would take a call from an account manager with "
-                 "options that fit; if no, accept it and say the free listing stays active. Always record their "
-                 "answer as comeback_interest (yes / maybe / no), and the agreed time as followup_time."),
+                 "bataya tha leads relevant nahi the, sahi?') instead of asking cold; otherwise ask openly. Let them "
+                 "explain fully."),
+                ("solution", "How it can be fixed", "Suggest one or two fixes for THEIR problem from the call context "
+                 "('How their problem can be addressed'), in simple words, as what the executive will set up with "
+                 "them. Ask if that would solve it for them; record what they say as what_would_change."),
+                ("meeting", "Fix the meeting", "Offer a short meeting with an IndiaMART executive to set this up: get "
+                 "visit or online, a day, and a time between 11 am and 5 pm, one at a time. If they refuse a "
+                 "meeting, offer a callback at a time they pick instead."),
                 CLOSE],
-               ("Why should I come back / what is new: do not oversell; ask what they need and say the account manager "
-                "can show what fits.",
-                "Price was too high: acknowledge; the account manager can discuss plan options; Payal does not quote.",
-                "Leads were fake or irrelevant: acknowledge, ask which kind, note it; lead preferences can be set by "
-                "product and city.",
-                "I use another platform now: respect it, never criticise competitors; ask what works better there."),
-               ("churn_reason", "what_would_change", "comeback_interest", "followup_time", "competitor", "callback")),
+               ("Why should I come back / what is new: do not oversell; point to the fix for their problem and the "
+                "meeting where the executive sets it up.",
+                "Price was too high: acknowledge; the executive shows plan options in the meeting; Payal does not quote.",
+                "Just tell me on the phone: give the one-line fix, then say the executive sets it up on their account "
+                "in a short meeting, online if they prefer.",
+                "I use another platform now: respect it, never criticise competitors; IndiaMART can run alongside."),
+               ("churn_reason", "what_would_change", "meeting_day", "meeting_time", "meeting_mode", "competitor",
+                "callback")),
     archetypes={
         "burned": Archetype("burned", "Left after a bad experience", "empathetic_listener",
-                            "Hear them out first: let them describe what went wrong, acknowledge it in their own words, "
-                            "apologise only once in the whole call, note it for the account manager. Only then ask "
-                            "what would need to change.",
+                            "Hear them out first: let them describe what went wrong and acknowledge it in their own "
+                            "words. Then move to the concrete fix for exactly that problem and a meeting with an "
+                            "executive to set it up.",
                             {"empathy": "high", "warmth": "calm"}),
         "price": Archetype("price", "Left over cost / value", "advisor",
-                           "Consultative: talk about value with their own numbers (enquiries on the plan), ask what "
-                           "return they need, and offer an account-manager call about options that fit their budget.",
+                           "Consultative: talk value with their own numbers (enquiries on the plan), then propose a "
+                           "meeting where the executive shows plan options that fit their budget.",
                            {"vocabulary": "business"}),
         "competitor": Archetype("competitor", "Moved to another platform", "gentle_nudger",
-                                "Respectful curiosity: never criticise the other platform; ask what works better there "
-                                "and what IndiaMART could do differently; keep the door open, no pressure.",
-                                {"sentence_length": "short"}),
+                                "Respectful curiosity: never criticise the other platform; ask what works better there, "
+                                "say IndiaMART can run alongside, and offer a short online meeting to see the demand "
+                                "in their category.", {"sentence_length": "short"}),
         "drifted": Archetype("drifted", "Drifted away", "closer",
                              "Warm reconnect: remind them of the buyers they got on IndiaMART, ask why they stopped, "
-                             "and invite them back with an account-manager call.", {"warmth": "high"}),
+                             "and close a concrete meeting slot to restart.", {"warmth": "high"}),
     },
     choose=_choose_winback,
     context=_winback_context,
-    checklist=lambda row: [("churn_reason", "why they left"), ("what_would_change", "what would bring them back"),
-                           ("comeback_interest", "open to coming back"),
-                           ("followup_time", "account-manager callback time")],
+    checklist=lambda row: [("churn_reason", "why they left"), ("what_would_change", "fix they agree with"),
+                           ("meeting_day", "meeting day"), ("meeting_time", "meeting time"),
+                           ("meeting_mode", "visit or online")],
 )
 
 
 USE_CASES: dict[str, UseCase] = {u.id: u for u in (ENRICHMENT, MEETING, QUALIFY, RECOVER, ONBOARD, RENEW, ISSUE,
                                                    CATALOGUE, WINBACK)}
 USE_CASE_FLOWS: dict[str, Flow] = {u.flow.mode: u.flow for u in USE_CASES.values()}
-# A note that settles another checklist item: (mode -> {note: (implied note, value)}).
-NOTE_IMPLIES = {"win_back": {"followup_time": ("comeback_interest", "yes, agreed to an account-manager call")}}
 ALIASES = {"seller": "meeting_scheduling", "meeting": "meeting_scheduling", "enrichment": "seller_enrichment",
            "qualification": "lead_qualification", "recovery": "response_recovery", "catalogue": "catalogue_verification",
            "issue": "issue_resolution", "renewal_upgrade": "renewal", "winback": "win_back", "churn": "win_back",

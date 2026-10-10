@@ -142,6 +142,30 @@ BUYER = Flow(
 
 FLOWS = {f.mode: f for f in (SELLER, BUYER)}
 
+# How a good human agent sounds on each journey (keyed by flow mode).
+HUMAN_TOUCH = {
+    "seller": "Be curious about their business first, like an RM who likes talking shop; the meeting comes up "
+              "naturally once they see something in it for them, never as a script line.",
+    "buyer": "Shop-counter helpful: quick, friendly, focused on getting them the right seller; if they sound unsure, "
+             "help them think ('kis kaam ke liye chahiye?').",
+    "seller_enrichment": "Make it feel like a quick friendly chat, not a form: 'bas do-teen cheezein confirm karni "
+                         "thi'. React to answers ('achha, Prestige bhi rakhte ho, badhiya').",
+    "lead_qualification": "Sound like a colleague passing on a good lead, with a little urgency: 'ek achhi enquiry "
+                          "aayi hai aapke liye'.",
+    "response_recovery": "No blame at all: assume they were busy ('shayad busy rahe honge'); keep it light and "
+                         "practical.",
+    "onboarding": "Welcoming and encouraging; celebrate every step done ('bahut badhiya, ek ho gaya') and make the "
+                  "next one sound easy.",
+    "renewal": "Like an account manager who knows them: genuinely ask how the year went before anything about "
+               "renewal.",
+    "issue_resolution": "Own the problem as a person ('main dekh rahi hoon aapka issue'); never sound like you are "
+                        "reading out a ticket.",
+    "catalogue_verification": "Brisk and practical, like checking a list together: 'pehla wala, ... abhi bhi "
+                              "chal raha hai?'",
+    "win_back": "Like their old account manager reconnecting: genuine and warm ('kaafi time ho gaya'), confident "
+                "that the problem can be fixed, never desperate.",
+}
+
 BUYER_FACTS = {
     "agent_name": "Payal",
     "company": "IndiaMART",

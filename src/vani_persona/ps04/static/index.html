@@ -94,8 +94,6 @@
   .msg .meta { font-size:11px; color:var(--mute); margin-top:3px; }
   .msg.pending { opacity:.65; border:1px dashed var(--acc); }
   .sw { margin:7px auto; font-size:12px; background:#2a2108; border:1px dashed #6b5312; border-radius:10px; padding:6px 10px; max-width:92%; }
-  .composer { display:flex; gap:8px; padding-top:10px; border-top:1px solid var(--line); }
-
   /* ---- controls ---- */
   .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   button { border:0; border-radius:8px; padding:8px 14px; font-weight:700; cursor:pointer; background:var(--acc); color:var(--acc-ink); transition:filter .15s; font-family:inherit; }
@@ -257,11 +255,7 @@
         <label title="Speak over the agent to cut it off. Use headphones, or its own voice may trigger this."><input type="checkbox" id="bargein"> Let me interrupt (headphones)</label>
       </div>
       <div id="chat">
-        <div class="empty"><div><b>No call yet</b>Pick a seller, check the use case, then press <i>Start call</i>.<br>Speak into the mic, or type seller lines below.</div></div>
-      </div>
-      <div class="composer">
-        <input type="text" id="typed" placeholder="Start a call to type seller lines here" disabled onkeydown="if(event.key==='Enter')sendTyped()">
-        <button class="sec" id="sendBtn" onclick="sendTyped()" disabled>Send</button>
+        <div class="empty"><div><b>No call yet</b>Pick a seller, check the use case, then press <i>Start call</i>.<br>Then just speak into the mic.</div></div>
       </div>
     </div>
   </section>
@@ -336,12 +330,6 @@ async function api(path, opts) {
 }
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function status(t, cls) { const s = document.getElementById('status'); s.textContent = t; s.className = cls || ''; }
-function setComposer(on) {
-  const t = document.getElementById('typed');
-  t.disabled = !on; document.getElementById('sendBtn').disabled = !on;
-  t.placeholder = on ? 'Type what the seller says (if you have no mic) and press Enter' : 'Start a call to type seller lines here';
-}
-
 function tab(g, id) {
   document.querySelectorAll(`.tabs[data-g="${g}"] button`).forEach(b => b.classList.toggle('on', b.dataset.t === id));
   document.querySelectorAll(`.pane[data-g="${g}"]`).forEach(p => p.classList.toggle('on', p.dataset.t === id));
@@ -651,7 +639,7 @@ function handle(r) {
   if (r.profile) renderProfile(r.profile);
   const changed = new Set((r.switches || []).flatMap(e => Object.keys(e.change)));
   if (r.settings) renderSettings(r.settings, changed);
-  if (r.reply) addMsg('bot', r.reply, `${r.settings ? r.settings.speaker + ' · pace ' + r.settings.pace + ' · ' + r.settings.language : ''}`);
+  if (r.reply) addMsg('bot', (r.ack ? r.ack + ' ' : '') + r.reply, `${r.settings ? r.settings.speaker + ' · pace ' + r.settings.pace + ' · ' + r.settings.language : ''}`);
   document.getElementById('timings').textContent = timingText(r.timings);
   if (r.credits) showCredits(r.credits);
   if (r.outcome && r.outcome.meeting) addMsg('bot', '✅ Meeting: ' + r.outcome.meeting);
@@ -674,11 +662,11 @@ async function startCall() {
                                             body: JSON.stringify({seller: SELLER || 'unknown', persona, mode, product, stream: true})});
     document.getElementById('analyst').textContent = 'Starting persona: ' + (r.start_reason || '');
   } catch (e) { status(e.message); busy = false; return; }
-  busy = false; setComposer(true); listen();
+  busy = false; listen();
 }
-function endCall() { ended = true; vadOn = false; if (PLAYER) PLAYER.stop(); status('call ended'); document.getElementById('endBtn').disabled = true; setComposer(false); }
+function endCall() { ended = true; vadOn = false; if (PLAYER) PLAYER.stop(); status('call ended'); document.getElementById('endBtn').disabled = true; }
 function listen(keepIdle) {
-  if (ended) { status('call ended'); vadOn = false; setComposer(false); return; }
+  if (ended) { status('call ended'); vadOn = false; return; }
   chunks = []; silentMs = 0; voicedMs = 0; loudMs = 0;
   if (!keepIdle) idleMs = 0;
   vadOn = document.getElementById('handsfree').checked;
@@ -698,11 +686,6 @@ async function send(url, opts, label) {
 function sendAudio(wav) { return send(turnUrl(), {method: 'POST', headers: {'Content-Type': 'audio/wav'}, body: wav}); }
 function sendFlush() { PENDING = false; return send(turnUrl('&flush=1'), {method: 'POST'}); }
 function sendNudge() { return send(turnUrl('&nudge=1'), {method: 'POST'}, 'checking in'); }
-async function sendTyped() {
-  const el = document.getElementById('typed'); const text = el.value.trim();
-  if (!text || !SESSION || busy) return; el.value = '';
-  await send(turnUrl(), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text})});
-}
 async function downloadLog() {
   if (!SESSION) return;
   const j = await api('/api/log?session=' + SESSION);
