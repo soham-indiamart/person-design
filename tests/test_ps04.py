@@ -357,6 +357,70 @@ def test_session_waits_for_unfinished_turn_then_merges(monkeypatch, tmp_path):
     assert r["nudge"] == 1 and not r["ended"]
 
 
+def test_cooked_seller_file_maps_every_use_case_and_archetype():
+    from vani_persona.ps04.seller_file import SAMPLE, build_spec, parse
+    from vani_persona.ps04.use_cases import USE_CASES
+
+    rows = parse(SAMPLE.read_bytes(), SAMPLE.name)
+    specs = {r["company_name"]: build_spec(r, EVIDENCE) for r in rows}
+    assert "voice" not in specs["Kumar Sanitary Store"]                     # do-not-call: suppressed
+    got = {s["use_case"]["id"] for s in specs.values() if "use_case" in s}
+    assert got == set(USE_CASES)
+    expect = {
+        "Sharma Bartan Bhandar": ("seller_enrichment", "shopkeeper", "normal"),
+        "Patel Polymers Pvt Ltd": ("seller_enrichment", "manufacturer", "advisor"),
+        "Verma Electricals": ("meeting_scheduling", "rushed", "quick_direct"),
+        "Shree Ganesh Steel": ("lead_qualification", "experienced", "normal"),
+        "Kaveri Handlooms": ("lead_qualification", "unfamiliar", "patient_explainer"),
+        "Bharat Packaging": ("response_recovery", "disengaged", "gentle_nudger"),
+        "Maa Durga Sweets": ("onboarding", "beginner", "patient_explainer"),
+        "Gupta Hardware & Tools": ("renewal", "dissatisfied", "empathetic_listener"),
+        "Royal Furniture House": ("issue_resolution", "frustrated", "empathetic_listener"),
+        "Bengal Jute Exports Ltd": ("catalogue_verification", "large", "advisor"),
+    }
+    for company, (uid, arch, persona) in expect.items():
+        uc = specs[company]["use_case"]
+        assert (uc["id"], uc["archetype"]["id"], uc["start_persona"]) == (uid, arch, persona), company
+    assert specs["Shree Ganesh Steel"]["use_case"]["reason"].startswith("Inferred")   # blank use_case column
+    assert any("TMT" in c for c in specs["Shree Ganesh Steel"]["use_case"]["context"])
+
+
+def test_use_case_inference_priority_and_override():
+    from vani_persona.ps04.use_cases import apply_use_case, infer_use_case
+
+    needs = {"ticket_summary": "app login fails", "subscription_expiry_days": 10, "unreplied_enquiries": 4}
+    assert infer_use_case(needs)[0] == "issue_resolution"                   # an open issue comes first
+    assert infer_use_case({**needs, "ticket_status": "closed"})[0] == "renewal"
+    assert infer_use_case({})[0] == "meeting_scheduling"
+    assert infer_use_case({"use_case": "Catalogue"})[0] == "catalogue_verification"
+    spec = apply_use_case(generate(row(), EVIDENCE), {"listings_to_verify": "Pipe | 10 rupees"}, "catalogue_verification")
+    plan = spec["conversation_plan"]
+    assert spec["call_mode"] == "catalogue_verification" and "meeting" not in spec["facts"]["purpose"].lower()
+    assert not any("meeting" in s.lower() for s in plan["opening"]["steps"])
+    assert not any("meeting" in p["approach"].lower() for p in plan["objection_playbook"])
+    assert spec["use_case"]["checklist"] == [{"key": "listing_1", "label": "Pipe"}]
+
+
+def test_use_case_session_prompt_checklist_and_rest_persona(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live, sarvam
+    from vani_persona.ps04.live import CallSession
+    from vani_persona.ps04.use_cases import apply_use_case
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (
+        "Ji, aapke brands kaun se hain? ##STAGE: collect## ##NOTE: brands=Prestige, Hawkins##", 5))
+    data = {"nature_of_business": "Manufacturer", "profile_missing_fields": "brands; moq"}
+    spec = apply_use_case(generate(row(), EVIDENCE), data)
+    s = CallSession(spec)
+    assert s.persona_id == s.rest_persona == "advisor"
+    prompt = s.system_prompt()
+    assert "USE CASE: Seller enrichment" in prompt and "brands = brands they deal in" in prompt
+    assert PERSONAS["quick_direct"].behaviour_for("seller_enrichment") != PERSONAS["quick_direct"].behaviour
+    r = s.open(stream=True)
+    assert r["flow"]["progress"] == {"done": 1, "total": 2} and r["flow"]["stage"] == "collect"
+    assert "brands =" not in s.system_prompt() and "moq = " in s.system_prompt()   # answered items drop off
+
+
 def test_credit_cap_blocks_before_sending(tmp_path):
     import pytest
 

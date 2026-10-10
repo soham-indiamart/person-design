@@ -86,12 +86,15 @@ class Turn:
 
 def settings_from_spec(spec: dict) -> LiveSettings:
     v, lang, tone = spec["voice"], spec["language"], spec["tone"]
-    return LiveSettings(
+    s = LiveSettings(
         language=lang["primary"]["value"], mix=lang["hinglish_mix"]["value"], formality=lang["formality"]["value"],
         speaker=v["speaker"]["value"], pace=float(v["pace"]["value"]), expressiveness=float(v["expressiveness"]["value"]),
         warmth=tone["warmth"]["value"], empathy=tone["empathy"]["value"],
         sentence_length="short" if spec["seller_type"] == "time_pressed" else "normal",
     )
+    for k, d in (spec.get("use_case") or {}).get("delivery", {}).items():
+        setattr(s, k, d["value"])
+    return s
 
 
 DELIVERY_KEYS = ("pace", "expressiveness", "warmth", "empathy", "sentence_length", "vocabulary")
@@ -166,6 +169,8 @@ class CallSession:
             self.start_reason = f"Chosen before the call: {PERSONAS[start_persona].name}. Switches automatically from here."
         else:
             self.persona_id, self.start_reason = starting_persona(spec)
+        # Persona to settle back into when the seller is calm: what the use case and archetype call for.
+        self.rest_persona = (spec.get("use_case") or {}).get("start_persona") or "normal"
         self.profile: LiveProfile = profile_from_settings(self.base.language, self.base.mix, self.base.formality,
                                                           spec.get("seller_type", ""))
         self.unvoiced: str | None = None  # a language Saaras understands but Bulbul cannot speak
@@ -220,7 +225,21 @@ class CallSession:
         source = "IndiaMART's seller file" if f.mode == "seller" else "the call routing"
         meeting_tag = ("\nIf the seller has agreed a meeting day and time, append ##MEETING: <day and time>## to that reply."
                        if f.mode == "seller" else "")
+        uc = sp.get("use_case")
+        use_case = ""
+        if uc and f.mode != "buyer":
+            name = " / ".join(x for x in (uc.get("company"), uc.get("seller_name")) if x)
+            todo = "; ".join(f"{c['key']} = {c['label']}" for c in uc["checklist"] if c["key"] not in notes)
+            use_case = f"""
+USE CASE: {uc['name']}. Goal: {uc['goal']}
+APPROACH FOR THIS SELLER ({uc['archetype']['label']}, because {uc['archetype']['reason'].lower()}): {uc['archetype']['approach']}
+CALL CONTEXT (from the seller file; already known, never ask for it again):{(' Seller: ' + name + '.') if name else ''}
+{chr(10).join('- ' + c for c in uc['context']) or '- nothing specific'}
+CHECKLIST still open: {todo or 'all done: confirm and close'}
+Record each answer as ##NOTE: key=<the seller's answer>## with exactly these keys (e.g. listing_1=available, now 14 rupees per metre). When the seller's words already answer an item, record it and move to the next item; never ask them to confirm what they just said.
+"""
         return f"""{f.role}
+{use_case}
 
 FACTS (the only facts you may state):
 {facts}
@@ -323,9 +342,12 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
         text = re.sub(r"##.*?##|\[(END|MEETING:[^\]]*)\]", "", content, flags=re.S)
         text = re.sub(r"##.*$", "", text, flags=re.S)  # an unterminated tag at the end
         text = re.sub(r"\s+", " ", text).strip()
+        text = re.sub(r"\s+([,.।?!])", r"\1", text)          # a tag removed mid-sentence leaves " ," / " ."
+        text = re.sub(r"[,]\s*([.।?!])", r"\1", text)
         # A goodbye never asks a question, and the opening never ends the call.
         last_seller = next((t for t in reversed(self.turns) if t.role == "seller"), None)
         may_end = (bool(meeting) or "meeting" in self.outcome or self.escalate
+                   or (self.flow.mode != "seller" and self.flow_state["stage"] == self.flow.stages[-1].id)
                    or (last_seller is not None and any(END_PATTERN.search(normalize(x or "")) for x in
                                                        (last_seller.text, last_seller.meta.get("romanized")))))
         end = "HANGUP" in content and may_end and not text.rstrip().endswith("?")
@@ -352,8 +374,15 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
                         self.flow_state["notes"][k] = v[:80]
 
     def flow_status(self) -> dict:
-        return {**flow_card(self.spec), "stage": self.flow_state["stage"], "visited": self.flow_state["visited"],
-                "notes": self.flow_state["notes"]}
+        card = flow_card(self.spec)
+        notes = self.flow_state["notes"]
+        keys = [c["key"] for c in card["checklist"]]
+        done = [k for k in keys if k in notes]
+        progress = {"done": len(done), "total": len(keys)} if keys else None
+        if progress:
+            self.outcome["checklist"] = f"{len(done)}/{len(keys)}"
+        return {**card, "stage": self.flow_state["stage"], "visited": self.flow_state["visited"],
+                "notes": notes, "progress": progress}
 
     def _reply(self) -> tuple[str, dict]:
         return self._finish(*self._generate(self.settings, self.persona_id, self.escalate))
@@ -515,6 +544,8 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
         home = self.profile.home_persona
         home_reason = ("seller is impatient / wants it faster" if home == "quick_direct"
                        else "seller is relaxed again")
+        if home == "normal" and self.rest_persona != "normal":
+            home, home_reason = self.rest_persona, "seller is relaxed again; back to the persona this use case calls for"
         decision = self.director.decide(v, home=home, home_reason=home_reason)
         if decision.action == "escalate":
             self.escalate = True
@@ -602,7 +633,8 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         p = LOG_DIR / f"{self.id}.json"
         p.write_text(json.dumps({
-            "call_id": self.id, "call_mode": self.flow.mode, "seller_id": self.spec.get("seller_id"),
+            "call_id": self.id, "call_mode": self.flow.mode, "use_case": self.spec.get("use_case"),
+            "seller_id": self.spec.get("seller_id"),
             "seller_type": self.spec["seller_type"],
             "start_persona": self.timeline[0]["persona"], "start_reason": self.start_reason,
             "persona_timeline": self.timeline,

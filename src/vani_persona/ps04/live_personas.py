@@ -29,7 +29,36 @@ class LivePersona:
     buyer_behaviour: str = ""  # the same persona on a buyer help-desk call; empty = ``behaviour``
 
     def behaviour_for(self, mode: str) -> str:
-        return self.buyer_behaviour if mode == "buyer" and self.buyer_behaviour else self.behaviour
+        if mode == "buyer" and self.buyer_behaviour:
+            return self.buyer_behaviour
+        if mode not in ("seller", "buyer"):   # a non-meeting seller use case
+            return GENERAL_BEHAVIOUR.get(self.id, self.behaviour)
+        return self.behaviour
+
+
+# The same personas on seller calls that are not about a meeting (enrichment, renewal, issue...).
+GENERAL_BEHAVIOUR = {
+    "normal": "Follow the call flow and the approach for this seller; move the call forward one question at a time.",
+    "de_escalator": "The seller is irritated. Apologise once, briefly and sincerely. Do not argue or repeat yourself. "
+                    "One or two short sentences. Offer a callback at a time they choose, or to end the call.",
+    "quick_direct": "The seller is short of time. Skip small talk. One line on why you called, then only the single most "
+                    "important open checklist item, or offer a callback.",
+    "patient_explainer": "The seller did not understand. Re-explain the last point in very simple words, one idea per "
+                         "sentence, with an example from their business. Then ask one easy question. Never ask 'did "
+                         "you understand'.",
+    "closer": "The seller is positive. Be warm; finish the remaining checklist items quickly and confirm the next step "
+              "back to them.",
+    "reassurer": "The seller doubts who is calling. Say plainly you are Payal, IndiaMART's AI assistant, calling about "
+                 "their IndiaMART seller account, and why. Never ask for payment, OTP or personal details.",
+    "gentle_nudger": "The seller is unsure, not refusing. Do not push. Offer a smaller step (just one detail now, or a "
+                     "callback) and reassure them it costs nothing.",
+    "empathetic_listener": "The seller is unhappy about something. Acknowledge the specific problem in their own words "
+                           "and apologise once. Do not defend IndiaMART. Say it will be noted for the right team, then "
+                           "gently return to the call flow.",
+    "respectful_persuader": "The seller is not interested. Accept it without arguing. Give one reason that fits them in "
+                            "one sentence and ask whether a short callback later would work. If they refuse again, "
+                            "thank them warmly and end the call.",
+}
 
 
 PERSONAS: dict[str, LivePersona] = {p.id: p for p in [
@@ -135,6 +164,10 @@ def starting_persona(spec: dict) -> tuple[str, str]:
     """Persona for the first turn, from the seller file. Returns (persona id, reason)."""
     if spec.get("call_mode") == "buyer":
         return "normal", "Buyer help desk: start neutral; the live read takes over from the first reply."
+    uc = spec.get("use_case")
+    if uc and uc.get("start_persona") in PERSONAS:
+        a = uc["archetype"]
+        return uc["start_persona"], f"{uc['name']}, {a['label'].lower()}: {a['reason']}."
     if spec.get("seller_type") == "time_pressed":
         return "quick_direct", "Seller file: past calls were very short / deferred, so start brisk."
     steps = " ".join(spec.get("conversation_plan", {}).get("opening", {}).get("steps", []))

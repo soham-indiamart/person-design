@@ -160,12 +160,16 @@ BUYER_GUARDRAILS = [
 
 
 def flow_for(spec: dict) -> Flow:
-    return FLOWS.get(spec.get("call_mode", "seller"), SELLER)
+    from vani_persona.ps04.use_cases import USE_CASE_FLOWS
+
+    mode = spec.get("call_mode", "seller")
+    return FLOWS.get(mode) or USE_CASE_FLOWS.get(mode, SELLER)
 
 
 def buyer_spec(base: dict, product: str | None) -> dict:
     """A buyer help-desk spec reusing the voice/language baseline of ``base``."""
     spec = copy.deepcopy(base)
+    spec.pop("use_case", None)
     product = (product or "").strip()
     spec.update({
         "call_mode": "buyer",
@@ -196,5 +200,8 @@ def buyer_spec(base: dict, product: str | None) -> dict:
 
 def flow_card(spec: dict) -> dict:
     f = flow_for(spec)
-    return {"mode": f.mode, "label": f.label, "counterpart": f.counterpart,
-            "stages": [{"id": s.id, "name": s.name} for s in f.stages]}
+    uc = spec.get("use_case") or {}
+    return {"mode": f.mode, "label": uc.get("name") or f.label, "counterpart": f.counterpart,
+            "stages": [{"id": s.id, "name": s.name} for s in f.stages],
+            "goal": uc.get("goal"), "metric": uc.get("metric"), "checklist": uc.get("checklist", []),
+            "archetype": (uc.get("archetype") or {}).get("label")}

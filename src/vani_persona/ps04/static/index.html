@@ -77,8 +77,17 @@
 </header>
 <main>
   <section class="col">
+    <div class="card scroll" style="flex:1.4">
+      <h2>1 · Seller data file</h2>
+      <div class="controls">
+        <input type="file" id="sellerFile" accept=".csv,.json,.xlsx" onchange="uploadFile(this.files[0])" style="max-width:190px">
+        <button class="sec" onclick="loadSample()">Load sample</button>
+      </div>
+      <div class="reason" id="fileName" style="margin:4px 0 6px"></div>
+      <div id="fileSellers"></div>
+    </div>
     <div class="card scroll" style="flex:1">
-      <h2>1 · Pick a seller</h2>
+      <h2>or a PS07 sample seller</h2>
       <div id="sellers"></div>
       <div class="controls" style="margin-top:6px">
         <input type="text" id="sellerId" placeholder="or any seller id from the file">
@@ -99,8 +108,8 @@
     <div class="card" style="display:flex; flex-direction:column; flex:1; min-height:0">
       <h2>2 · Live call</h2>
       <div class="controls" style="margin-bottom:6px">
-        <label class="reason">call type <select id="mode" onchange="modeChanged()">
-          <option value="seller">Seller outreach (VANI calls a seller)</option>
+        <label class="reason">use case <select id="mode" onchange="modeChanged()">
+          <option value="auto">Auto (from the seller file)</option>
           <option value="buyer">Buyer help desk (a buyer calls in)</option></select></label>
         <input type="text" id="product" placeholder="product the buyer asks about (optional)" style="display:none">
       </div>
@@ -178,14 +187,38 @@ async function api(path, opts) {
 function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function status(t, cls) { const s = document.getElementById('status'); s.textContent = t; s.className = cls || ''; }
 
+function sellerCard(s) {
+  if (s.dnc) return `<div class="seller" style="opacity:.6"><b>${esc(s.key.replace(/^f:/, ''))}</b> <span class="tag">do not call</span><div class="reason">${esc(s.summary)}</div></div>`;
+  const uc = s.use_case;
+  const head = uc ? `<b>${esc(uc.who || s.key.replace(/^f:/, ''))}</b><br><span class="tag moderate">${esc(uc.name)}</span> <span class="tag">${esc(uc.archetype)}</span>`
+                  : `<b>${esc(s.seller_type.replace(/_/g,' '))}</b> <span class="tag">${esc(s.confidence)}</span>`;
+  return `<div class="seller" data-k="${esc(s.key)}" onclick="pick('${esc(s.key)}')">${head}
+      ${uc && uc.requirement ? `<div class="reason"><b>Needs:</b> ${esc(uc.requirement)}</div>` : ''}
+      ${uc ? `<div class="reason"><i>${esc(uc.reason)}</i></div>` : `<div class="reason">${esc(s.summary)}</div>`}
+      <div class="reason">starts as <b>${esc(s.start_persona)}</b> — ${esc(s.start_reason)}</div>
+      <div class="chips">${Object.entries(s.settings).map(([k,v]) => `<span class="chip">${k}: ${esc(v)}</span>`).join('')}</div></div>`;
+}
+function renderFile(f) {
+  document.getElementById('fileName').textContent = f.name ? `${f.name} · ${f.sellers.length} sellers` : 'No file loaded';
+  document.getElementById('fileSellers').innerHTML = f.sellers.map(sellerCard).join('');
+}
+async function uploadFile(file) {
+  if (!file) return;
+  status('reading seller file…', 'thinking');
+  try {
+    const f = await api('/api/upload?name=' + encodeURIComponent(file.name), {method: 'POST', body: await file.arrayBuffer()});
+    renderFile(f); status('idle');
+  } catch (e) { status(e.message); }
+}
+async function loadSample() {
+  try { renderFile(await api('/api/upload?sample=1', {method: 'POST'})); } catch (e) { status(e.message); }
+}
 async function loadSellers() {
   const j = await api('/api/sellers');
-  const box = document.getElementById('sellers');
-  box.innerHTML = j.sellers.map(s => `<div class="seller" data-k="${s.key}" onclick="pick('${s.key}')">
-      <b>${esc(s.seller_type.replace(/_/g,' '))}</b> <span class="tag">${esc(s.confidence)}</span>
-      <div class="reason">${esc(s.summary)}</div>
-      <div class="reason">starts as <b>${esc(s.start_persona)}</b> — ${esc(s.start_reason)}</div>
-      <div class="chips">${Object.entries(s.settings).map(([k,v]) => `<span class="chip">${k}: ${esc(v)}</span>`).join('')}</div></div>`).join('');
+  document.getElementById('sellers').innerHTML = j.sellers.map(sellerCard).join('');
+  renderFile(j.file);
+  document.getElementById('mode').insertAdjacentHTML('beforeend',
+    j.use_cases.map(u => `<option value="${u.id}" title="${esc(u.goal)}">${esc(u.name)}</option>`).join(''));
   if (j.credits) showCredits(j.credits);
   for (const p of j.personas) PERSONAS[p.id] = p;
   LANGS = {...j.languages.speak_and_understand, ...j.languages.understand_only};
@@ -199,6 +232,11 @@ function modeChanged() {
   document.getElementById('product').style.display = buyer ? '' : 'none';
   if (buyer) document.getElementById('startBtn').disabled = false;
   else document.getElementById('startBtn').disabled = !SELLER;
+  if (SELLER && !buyer) pick(SELLER);
+}
+function useCaseParam() {
+  const m = document.getElementById('mode').value;
+  return m === 'auto' || m === 'buyer' ? '' : '&use_case=' + encodeURIComponent(m);
 }
 function renderFlow(f) {
   if (!f) return;
@@ -206,14 +244,19 @@ function renderFlow(f) {
   const visited = new Set(f.visited || []);
   const stages = f.stages.map((s, i) => `${i ? '<span>›</span>' : ''}<span class="stage ${s.id === f.stage ? 'now' : visited.has(s.id) ? 'done' : ''}">${esc(s.name)}</span>`).join('');
   const notes = Object.entries(f.notes || {});
-  document.getElementById('flow').innerHTML = `<div class="stages">${stages}</div>` +
+  const ck = (f.checklist || []);
+  const checklist = ck.length ? `<div style="margin-top:8px"><b>Checklist</b> ${f.progress ? `${f.progress.done}/${f.progress.total}` : ''}
+      <div class="bar"><div style="width:${f.progress ? 100 * f.progress.done / f.progress.total : 0}%;background:#12866b"></div></div>
+      <div class="chips">${ck.map(c => `<span class="chip" style="${(f.notes || {})[c.key] ? 'background:#ecfdf3;color:#067647' : ''}">${(f.notes || {})[c.key] ? '✓ ' : ''}${esc(c.label)}</span>`).join('')}</div></div>` : '';
+  document.getElementById('flow').innerHTML = (f.goal ? `<div class="reason" style="margin-bottom:6px">${f.archetype ? '<b>' + esc(f.archetype) + '</b> · ' : ''}${esc(f.goal)}</div>` : '') +
+    `<div class="stages">${stages}</div>` + checklist +
     (notes.length ? `<div class="kv" style="margin-top:8px">${notes.map(([k, v]) => `<div class="k">${esc(k.replace(/_/g, ' '))}</div><div class="v">${esc(v)}</div>`).join('')}</div>`
                   : `<div class="reason" style="margin-top:6px">Nothing captured yet.</div>`);
 }
 async function pick(k) {
   SELLER = k;
   document.querySelectorAll('.seller').forEach(e => e.classList.toggle('sel', e.dataset.k === k));
-  const spec = await api('/api/spec?seller=' + encodeURIComponent(k));
+  const spec = await api('/api/spec?seller=' + encodeURIComponent(k) + useCaseParam());
   renderSpec(spec);
   document.getElementById('startBtn').disabled = false;
 }
@@ -223,8 +266,15 @@ function ev(e) { if (!e) return ''; return ` <span class="tag ${e.strength}">${e
 function row(name, s) { return `<tr><td><b>${esc(name)}</b></td><td>${esc(typeof s.value === 'object' ? JSON.stringify(s.value) : s.value)}</td><td class="reason">${esc(s.reason)}${ev(s.evidence)} <i>(${esc(s.confidence)})</i></td></tr>`; }
 function renderSpec(spec) {
   if (!spec.voice) { document.getElementById('spec').innerHTML = '<p>Do-not-call seller: no persona.</p>'; return; }
-  const p = spec.conversation_plan;
-  let h = `<p class="reason">${esc(spec.summary)} · overall confidence <b>${esc(spec.overall_confidence)}</b>${spec.missing_fields.length ? ' · missing: ' + esc(spec.missing_fields.join(', ')) : ''}</p><table>`;
+  const p = spec.conversation_plan, uc = spec.use_case;
+  let h = `<p class="reason">${esc(spec.summary)} · overall confidence <b>${esc(spec.overall_confidence)}</b>${spec.missing_fields.length ? ' · missing: ' + esc(spec.missing_fields.join(', ')) : ''}</p>`;
+  if (uc) {
+    h += `<p><b>Use case: ${esc(uc.name)}</b> <span class="reason">— ${esc(uc.reason)}</span><br><span class="reason">Goal: ${esc(uc.goal)}<br>Success metric: ${esc(uc.metric)}</span></p>`;
+    h += `<p><b>Seller archetype: ${esc(uc.archetype.label)}</b> <span class="reason">— ${esc(uc.archetype.reason)}</span><br>Approach: ${esc(uc.archetype.approach)}<br>Starts and rests as <b>${esc(pname(uc.start_persona))}</b></p>`;
+    if (uc.context.length) h += '<p><b>Requirement (from the file)</b></p><ul>' + uc.context.map(c => `<li>${esc(c)}</li>`).join('') + '</ul>';
+    h += '<p><b>Checklist (success metric)</b>: ' + uc.checklist.map(c => `<span class="chip">${esc(c.label)}</span>`).join(' ') + '</p>';
+  }
+  h += '<table>';
   for (const [k, v] of Object.entries(spec.voice)) h += row('voice.' + k, v);
   for (const [k, v] of Object.entries(spec.language)) h += row('language.' + k, v);
   for (const [k, v] of Object.entries(spec.tone)) h += row('tone.' + k, v);

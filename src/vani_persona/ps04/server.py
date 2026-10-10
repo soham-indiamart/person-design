@@ -25,6 +25,8 @@ from vani_persona.ps04.flows import FLOWS, buyer_spec
 from vani_persona.ps04.generator import generate
 from vani_persona.ps04.live import CallSession
 from vani_persona.ps04.live_personas import PERSONAS, starting_persona
+from vani_persona.ps04.seller_file import SAMPLE, build_spec, parse
+from vani_persona.ps04.use_cases import USE_CASES, apply_use_case, resolve
 
 STATIC = Path(__file__).parent / "static"
 ART = REPO_ROOT / "artifacts" / "ps04"
@@ -40,6 +42,17 @@ class State:
         self.shared = json.loads(shared_p.read_text(encoding="utf-8")) if shared_p.exists() else None
         self._sellers = None
         self._lock = threading.Lock()
+        self.file_name, self.file_rows = "", {}
+        if SAMPLE.exists():
+            self.load_file(SAMPLE.read_bytes(), SAMPLE.name)
+
+    def load_file(self, data: bytes, name: str) -> None:
+        rows = parse(data, name)
+        self.file_name, self.file_rows = name, {"f:" + r["_key"]: r for r in rows}
+
+    def file_cards(self) -> list[dict]:
+        ev = load_evidence()
+        return [_card(k, build_spec(r, ev)) for k, r in self.file_rows.items()]
 
     def sellers(self):
         with self._lock:
@@ -49,7 +62,14 @@ class State:
                 self._sellers = df.set_index("fk_glusr_usr_id", drop=False)
             return self._sellers
 
-    def spec_for(self, key: str) -> dict:
+    def spec_for(self, key: str, use_case: str | None = None) -> dict:
+        """Spec for a seller; ``use_case`` (if given) overrides the one in / inferred from the seller file."""
+        if key in self.file_rows:
+            return build_spec(self.file_rows[key], load_evidence(), use_case)
+        spec = self._base_spec(key)
+        return apply_use_case(spec, {}, use_case) if resolve(use_case) else spec
+
+    def _base_spec(self, key: str) -> dict:
         if key == "unknown":
             spec = generate({"fk_glusr_usr_id": None}, load_evidence())
             spec["seller_type"] = "unknown"
@@ -67,10 +87,15 @@ class State:
 
 def _card(key: str, spec: dict) -> dict:
     if "voice" not in spec:
-        return {"key": key, "seller_type": spec["seller_type"], "summary": "Do-not-call: no persona generated"}
+        return {"key": key, "seller_type": spec["seller_type"], "summary": "Do-not-call: no persona generated",
+                "dnc": True}
     start, why = starting_persona(spec)
+    uc = spec.get("use_case")
     return {
         "key": key, "seller_type": spec["seller_type"], "summary": spec["summary"],
+        "use_case": ({"id": uc["id"], "name": uc["name"], "reason": uc["reason"], "archetype": uc["archetype"]["label"],
+                      "requirement": " ".join(uc["context"]), "who": " / ".join(
+                          x for x in (uc.get("company"), uc.get("seller_name")) if x)} if uc else None),
         "confidence": spec["overall_confidence"], "start_persona": PERSONAS[start].name, "start_reason": why,
         "settings": {
             "speaker": spec["voice"]["speaker"]["value"], "pace": spec["voice"]["pace"]["value"],
@@ -167,13 +192,16 @@ def make_handler(state: State):
                                  "colour": p.colour} for p in PERSONAS.values()]
                     modes = [{"mode": f.mode, "label": f.label, "stages": [st.name for st in f.stages]}
                              for f in FLOWS.values()]
-                    self._json({"sellers": cards, "personas": personas, "modes": modes,
+                    use_cases = [{"id": u.id, "name": u.name, "goal": u.goal, "metric": u.metric}
+                                 for u in USE_CASES.values()]
+                    self._json({"sellers": cards, "personas": personas, "modes": modes, "use_cases": use_cases,
+                                "file": {"name": state.file_name, "sellers": state.file_cards()},
                                 "credits": sarvam.BUDGET.status(),
                                 "languages": {"speak_and_understand": sarvam.TTS_LANGUAGES,
                                               "understand_only": sarvam.STT_ONLY_LANGUAGES}})
                 elif u.path == "/api/spec":
                     try:
-                        self._json(state.spec_for(q["seller"][0]))
+                        self._json(state.spec_for(q["seller"][0], q.get("use_case", [None])[0]))
                     except (KeyError, ValueError) as e:
                         self._json({"error": str(e)}, HTTPStatus.NOT_FOUND)
                 elif u.path == "/api/log":
@@ -181,6 +209,7 @@ def make_handler(state: State):
                     if not s:
                         return self._json({"error": "no such session"}, HTTPStatus.NOT_FOUND)
                     self._json({"call_id": s.id, "seller_type": s.spec["seller_type"],
+                                "use_case": s.spec.get("use_case"), "flow": s.flow_status(),
                                 "start_settings": s.base.as_dict(), "final_settings": s.settings.as_dict(),
                                 "persona_timeline": s.timeline, "start_reason": s.start_reason,
                                 "live_profile": s.profile.as_dict(), "profile_history": s.profile.history,
@@ -198,13 +227,21 @@ def make_handler(state: State):
             u = urlparse(self.path)
             q = parse_qs(u.query)
             try:
-                if u.path == "/api/start":
+                if u.path == "/api/upload":
+                    if q.get("sample", ["0"])[0] == "1":
+                        state.load_file(SAMPLE.read_bytes(), SAMPLE.name)
+                    else:
+                        state.load_file(self._body(), q.get("name", ["sellers.csv"])[0])
+                    self._json({"name": state.file_name, "sellers": state.file_cards()})
+                elif u.path == "/api/start":
                     req = json.loads(self._body() or b"{}")
-                    spec = state.spec_for(str(req.get("seller") or "unknown"))
+                    mode = req.get("mode") or "auto"
+                    use_case = mode if resolve(mode) and mode != "seller" else None
+                    spec = state.spec_for(str(req.get("seller") or "unknown"), use_case)
                     if "voice" not in spec:
                         return self._json({"error": "This seller asked not to be called; the call is suppressed."},
                                           HTTPStatus.CONFLICT)
-                    if req.get("mode") == "buyer":
+                    if mode == "buyer":
                         spec = buyer_spec(spec, req.get("product"))
                     s = CallSession(spec, start_persona=req.get("persona") or None)
                     state.sessions[s.id] = s
