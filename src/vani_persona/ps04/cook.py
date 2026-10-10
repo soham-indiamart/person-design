@@ -6,7 +6,7 @@ All names, numbers and businesses are invented. Columns are the PS07 seller-file
 (same names and value formats) plus use-case columns:
 
 - ``use_case``: seller_enrichment | meeting_scheduling | lead_qualification |
-  response_recovery | onboarding | renewal | issue_resolution | catalogue_verification.
+  response_recovery | onboarding | renewal | issue_resolution | catalogue_verification | win_back.
   Leave it blank to let the system infer it from the columns below.
 - ``seller_name``, ``company_name``: who VANI is calling.
 - enrichment: ``profile_missing_fields`` (``;``-separated: product_range, brands,
@@ -21,6 +21,9 @@ All names, numbers and businesses are invented. Columns are the PS07 seller-file
   ``ticket_status``, ``ticket_prior_contacts``.
 - catalogue verification: ``listings_to_verify`` (``;`` between listings, ``|`` between
   fields), ``catalogue_size``.
+- win-back (had a paid plan and left): ``churned_plan``, ``months_on_plan``,
+  ``churned_days_ago``, ``churn_reason`` (free text from the exit note), ``competitor``,
+  ``enquiries_on_plan``.
 """
 
 from __future__ import annotations
@@ -155,6 +158,30 @@ SELLERS = [
          listings_to_verify="Jute shopping bag | 45 rupees per piece | MOQ 1000 pieces; "
                             "Jute hessian cloth | 70 rupees per metre | MOQ 500 metres; "
                             "Jute yarn | 95 rupees per kg | MOQ 1 tonne; Jute wine bottle bag | 60 rupees | MOQ 500"),
+    # 9. Win-back: took a paid plan and left (bad experience, cost, competitor, drifted).
+    dict(fk_glusr_usr_id=9100018, use_case=None, seller_name="Manoj Tiwari", company_name="Tiwari Agro Machinery",
+         seller_city="Varanasi", seller_state="Uttar Pradesh", business_type="Proprietorship",
+         annual_turnover="40 L - 1.5 Cr", nature_of_business="Manufacturer", gst_registration_year=2013,
+         top_category_1="Chaff Cutters", top_category_group="Agriculture Machinery", showed_frustration=1,
+         churned_plan="Leader, 1 year", months_on_plan=12, churned_days_ago=75, enquiries_on_plan=38,
+         churn_reason="most enquiries were irrelevant, from retail buyers wanting one piece"),
+    dict(fk_glusr_usr_id=9100019, use_case="win_back", seller_name="Neha Saxena", company_name="Saxena Office Supplies",
+         seller_city="Bhopal", seller_state="Madhya Pradesh", business_type="Partnership", annual_turnover="0 - 40 L",
+         nature_of_business="Trader - Wholesaler/Distributor", gst_registration_year=2017,
+         top_category_1="Office Stationery", top_category_group="Office Supplies", avg_answered_call_sec=60,
+         churned_plan="Star, 1 year", months_on_plan=24, churned_days_ago=40, enquiries_on_plan=150,
+         churn_reason="plan felt too expensive when business was slow"),
+    dict(fk_glusr_usr_id=9100020, use_case="win_back", seller_name="Arjun Nair", company_name="Malabar Spices Export",
+         seller_city="Kochi", seller_state="Kerala", business_type="Private Limited Company",
+         annual_turnover="5 - 25 Cr", nature_of_business="Exporter", gst_registration_year=2011,
+         top_category_1="Black Pepper", top_category_group="Spices", churned_plan="Leader, 1 year", months_on_plan=12,
+         churned_days_ago=120, enquiries_on_plan=90, competitor="TradeIndia",
+         churn_reason="switched to another platform"),
+    dict(fk_glusr_usr_id=9100021, use_case="win_back", seller_name="Sanjay Bansal", company_name="Bansal Tiles & Marble",
+         seller_city="Kishangarh", seller_state="Rajasthan", business_type="Proprietorship",
+         annual_turnover="1.5 - 5 Cr", nature_of_business="Trader - Wholesaler/Distributor",
+         gst_registration_year=2009, top_category_1="Marble Slabs", top_category_group="Building Construction Material",
+         churned_plan="Star, 1 year", months_on_plan=36, churned_days_ago=200, enquiries_on_plan=420),
     # Asked not to be called: suppressed, no persona.
     dict(fk_glusr_usr_id=9100017, use_case="meeting_scheduling", seller_name="Rakesh Kumar",
          company_name="Kumar Sanitary Store", seller_city="Kanpur", seller_state="Uttar Pradesh",
@@ -168,7 +195,8 @@ USE_CASE_COLS = [
     "enquiry_buyer_city", "enquiry_age_hours", "unreplied_enquiries", "onboarding_steps_pending",
     "registered_days_ago", "digital_experience", "subscription_plan", "subscription_expiry_days", "enquiries_on_plan",
     "satisfaction", "renewed_before", "ticket_type", "ticket_summary", "ticket_age_days", "ticket_status",
-    "ticket_prior_contacts", "listings_to_verify", "catalogue_size",
+    "ticket_prior_contacts", "listings_to_verify", "catalogue_size", "churned_plan", "months_on_plan",
+    "churned_days_ago", "churn_reason", "competitor",
 ]
 PROFILE_COLS = [
     "fk_glusr_usr_id", "seller_city", "seller_state", "business_type", "annual_turnover", "nature_of_business",

@@ -377,6 +377,10 @@ def test_cooked_seller_file_maps_every_use_case_and_archetype():
         "Gupta Hardware & Tools": ("renewal", "dissatisfied", "empathetic_listener"),
         "Royal Furniture House": ("issue_resolution", "frustrated", "empathetic_listener"),
         "Bengal Jute Exports Ltd": ("catalogue_verification", "large", "advisor"),
+        "Tiwari Agro Machinery": ("win_back", "burned", "empathetic_listener"),
+        "Saxena Office Supplies": ("win_back", "price", "advisor"),
+        "Malabar Spices Export": ("win_back", "competitor", "gentle_nudger"),
+        "Bansal Tiles & Marble": ("win_back", "drifted", "closer"),
     }
     for company, (uid, arch, persona) in expect.items():
         uc = specs[company]["use_case"]
@@ -399,6 +403,37 @@ def test_use_case_inference_priority_and_override():
     assert not any("meeting" in s.lower() for s in plan["opening"]["steps"])
     assert not any("meeting" in p["approach"].lower() for p in plan["objection_playbook"])
     assert spec["use_case"]["checklist"] == [{"key": "listing_1", "label": "Pipe"}]
+
+
+def test_win_back_use_case():
+    from vani_persona.ps04.use_cases import apply_use_case, infer_use_case
+
+    churned = {"churned_plan": "Star, 1 year", "churned_days_ago": 60, "churn_reason": "leads were fake",
+               "enquiries_on_plan": 40}
+    assert infer_use_case(churned)[0] == "win_back"
+    assert infer_use_case({**churned, "ticket_summary": "refund pending"})[0] == "issue_resolution"
+    assert infer_use_case({"use_case": "churned"})[0] == "win_back"
+    spec = apply_use_case(generate(row(), EVIDENCE), churned)
+    uc = spec["use_case"]
+    assert (uc["archetype"]["id"], uc["start_persona"]) == ("burned", "empathetic_listener")
+    assert any("Star, 1 year" in c for c in uc["context"]) and any("fake" in c for c in uc["context"])
+    assert [c["key"] for c in uc["checklist"]][0] == "churn_reason"
+    assert "meeting" not in spec["facts"]["purpose"].lower()
+    price = apply_use_case(generate(row(), EVIDENCE), {**churned, "churn_reason": "too expensive"})
+    assert price["use_case"]["archetype"]["id"] == "price"
+
+
+def test_win_back_callback_implies_comeback_interest(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live, sarvam
+    from vani_persona.ps04.live import CallSession
+    from vani_persona.ps04.use_cases import apply_use_case
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    monkeypatch.setattr(sarvam, "chat", lambda *a, **k: (
+        "Theek hai, kal 5 baje call aayega. ##STAGE: comeback## ##NOTE: followup_time=kal 5 baje##", 5))
+    s = CallSession(apply_use_case(generate(row(), EVIDENCE), {"churned_plan": "Star", "churn_reason": "too costly"}))
+    r = s.open(stream=True)
+    assert r["flow"]["notes"]["comeback_interest"].startswith("yes")
 
 
 def test_use_case_session_prompt_checklist_and_rest_persona(monkeypatch, tmp_path):

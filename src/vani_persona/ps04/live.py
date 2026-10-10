@@ -372,6 +372,12 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
                     k = re.sub(r"\W+", "_", k.lower()).strip("_")[:30]
                     if k and v and v.lower() not in ("none", "null", "unknown", "-"):
                         self.flow_state["notes"][k] = v[:80]
+        from vani_persona.ps04.use_cases import NOTE_IMPLIES
+
+        notes = self.flow_state["notes"]
+        for src, (dst, value) in NOTE_IMPLIES.get(self.flow.mode, {}).items():
+            if src in notes and dst not in notes:
+                notes[dst] = value
 
     def flow_status(self) -> dict:
         card = flow_card(self.spec)
