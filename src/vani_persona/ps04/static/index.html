@@ -28,7 +28,7 @@
   #credits { margin-left:auto; font-family:var(--mono); font-size:11.5px; color:var(--mute); border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
 
   /* ---- layout ---- */
-  main { display:grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr) minmax(330px, 420px); gap:14px; padding:14px; height: calc(100vh - 53px); }
+  main { display:grid; grid-template-columns: minmax(300px, 1fr) minmax(0, 1.6fr) minmax(310px, 1fr); gap:14px; padding:14px; height: calc(100vh - 53px); }
   .col { display:flex; flex-direction:column; gap:12px; min-height:0; min-width:0; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; min-width:0; }
   .card.hero { border-color:var(--line2); background:linear-gradient(180deg, #11241d, var(--card)); }
@@ -49,23 +49,28 @@
   .pane-body { overflow:auto; flex:1; min-height:0; padding-right:2px; }
 
   /* ---- sellers ---- */
-  .upload { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px; border:1px dashed var(--line2); border-radius:10px; background:var(--acc-soft); }
-  .upload .reason { flex-basis:100%; }
-  .upload .small { font-size:12px; color:var(--mute); display:flex; gap:5px; align-items:center; cursor:pointer; }
-  .upload.drag { border-color:var(--acc); background:var(--acc-soft); outline:2px solid var(--acc); }
-  .search { margin:10px 0 8px; }
+  .upload { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:6px 8px; border:1px dashed var(--line); border-radius:8px; flex:none; }
+  .upload .upbtn { font-weight:700; font-size:11.5px; color:var(--acc); border:1px solid var(--line2); border-radius:6px; padding:3px 9px; cursor:pointer; }
+  .upload .upbtn:hover { background:var(--acc-soft); }
+  .upload .small { font-size:11.5px; color:var(--mute); display:flex; gap:4px; align-items:center; cursor:pointer; }
+  .upload #fileName { flex:1 1 100%; font-size:11px; }
+  .upload.drag { border-color:var(--acc); background:var(--acc-soft); }
+  .search { margin:10px 0; flex:none; }
   .search input { width:100%; }
-  .seller { cursor:pointer; border:1px solid var(--line); background:var(--card2); border-radius:10px; padding:9px 11px; margin-bottom:8px; transition:border-color .15s, transform .15s; }
+  .seller { cursor:pointer; border:1px solid var(--line); border-left:3px solid var(--line2); background:var(--card2); border-radius:10px; padding:12px 14px; margin-bottom:10px; transition:border-color .15s, transform .15s; }
   .seller:hover { border-color:#2f7d62; transform:translateY(-1px); }
-  .seller.sel { border-color:var(--acc); box-shadow:0 0 0 2px var(--acc-soft); }
-  .seller.off { opacity:.55; cursor:default; transform:none; }
-  .seller .top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .seller .nm { font-weight:700; text-transform:capitalize; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .seller.sel { border-color:var(--acc); border-left-color:var(--acc); box-shadow:0 0 0 2px var(--acc-soft); background:#163027; }
+  .seller.off { opacity:.5; cursor:default; transform:none; }
+  .seller .top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .seller .nm { font-size:15px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .seller .person { font-size:12.5px; color:var(--mute); margin-top:1px; }
   .seller .top .tag { flex:none; }
-  .seller .tagrow { display:flex; flex-wrap:wrap; gap:4px; margin:3px 0 4px; }
-  .seller .starts { font-size:11.5px; color:var(--mute); margin-top:3px; }
-  .seller .starts b { color:var(--ink); }
-  .seller .more { display:none; margin-top:7px; padding-top:7px; border-top:1px dashed var(--line); }
+  .seller .tagrow { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0 6px; }
+  .seller .tagrow .tag { font-size:11px; padding:1px 8px; border-radius:999px; }
+  .seller .tagrow .tag.moderate { font-weight:700; }
+  .seller .starts { font-size:11.5px; color:var(--mute); margin-top:6px; }
+  .seller .starts b { color:var(--acc); }
+  .seller .more { display:none; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); }
   .seller.sel .more { display:block; }
   .seller.sel .clamp { -webkit-line-clamp:unset; }
   .clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -158,7 +163,7 @@
 
   /* Laptop: narrower side columns */
   @media (max-width: 1380px) {
-    main { grid-template-columns: minmax(280px, 330px) minmax(0, 1fr) minmax(300px, 370px); gap:12px; padding:12px; }
+    main { grid-template-columns: minmax(280px, 1fr) minmax(0, 1.5fr) minmax(290px, 1fr); gap:12px; padding:12px; }
     .steps { display:none; }
   }
   /* Tablet: sellers + call side by side, insights below; the page scrolls */
@@ -206,19 +211,17 @@
       </div>
       <div class="pane on" data-g="sellers" data-t="file">
         <div class="upload">
-          <input type="file" id="sellerFile" accept=".csv,.tsv,.txt,.json,.jsonl,.ndjson,.xlsx,.xls,.xml" onchange="uploadFile(this.files[0])">
-          <button class="sec" onclick="loadSample()">Load sample</button>
-          <label class="small" title="After an upload, start calling the first seller with the use case detected for them">
-            <input type="checkbox" id="autoCall" checked> Auto-call after upload</label>
-          <div class="reason" id="fileName">CSV, JSON, Excel or XML · drop a file here · one seller per row</div>
-          <div class="reason" id="fileRouting"></div>
+          <label class="upbtn">Upload file<input type="file" id="sellerFile" hidden accept=".csv,.tsv,.txt,.json,.jsonl,.ndjson,.xlsx,.xls,.xml" onchange="uploadFile(this.files[0])"></label>
+          <button class="sec sm" onclick="loadSample()">Sample</button>
+          <label class="small" title="Call the first seller as soon as a file is uploaded"><input type="checkbox" id="autoCall" checked> Auto-call</label>
+          <div class="reason clamp1" id="fileName">CSV · JSON · Excel · XML</div>
         </div>
         <div class="search"><input type="text" id="qFile" placeholder="Search sellers, use cases…" oninput="filterList('fileSellers', this.value)"></div>
         <div class="pane-body" id="fileSellers"></div>
       </div>
       <div class="pane" data-g="sellers" data-t="demo">
         <div class="controls">
-          <input type="text" id="sellerId" placeholder="Any seller id from the PS07 file" onkeydown="if(event.key==='Enter')pickCustom()">
+          <input type="text" id="sellerId" placeholder="Seller id" onkeydown="if(event.key==='Enter')pickCustom()">
           <button class="sec" onclick="pickCustom()">Load</button>
         </div>
         <div class="search"><input type="text" id="qDemo" placeholder="Filter samples…" oninput="filterList('sellers', this.value)"></div>
@@ -226,8 +229,7 @@
       </div>
     </div>
     <details class="card fold">
-      <summary>How it works · personas · languages</summary>
-      <div class="reason" style="margin-bottom:10px">Saaras STT → turn-taking → Behaviour Analyst + live profile → Persona Director → call flow → Sarvam LLM → Bulbul (streamed)</div>
+      <summary>Personas · languages</summary>
       <div class="pcat" id="pcat"></div>
       <div class="reason" id="langs" style="margin-top:10px"></div>
     </details>
@@ -241,12 +243,12 @@
       <div class="setup">
         <label class="field"><span>Use case</span>
           <select id="mode" onchange="modeChanged()">
-            <option value="auto">Auto (from the seller file)</option>
-            <option value="buyer">Buyer help desk (a buyer calls in)</option>
+            <option value="auto">Auto</option>
+            <option value="buyer">Buyer help desk</option>
           </select></label>
         <label class="field"><span>Start as</span>
-          <select id="startPersona"><option value="">Auto (from the data)</option></select></label>
-        <label class="field" id="productField" style="display:none"><span>Product the buyer asks about</span>
+          <select id="startPersona"><option value="">Auto</option></select></label>
+        <label class="field" id="productField" style="display:none"><span>Product</span>
           <input type="text" id="product" placeholder="optional"></label>
       </div>
       <div class="actions">
@@ -256,11 +258,11 @@
         <div class="live"><div class="meter" title="microphone level"><div id="level"></div></div></div>
       </div>
       <div class="toggles">
-        <label><input type="checkbox" id="handsfree" checked> Hands-free (auto-detect when I speak)</label>
-        <label title="Speak over the agent to cut it off. Use headphones, or its own voice may trigger this."><input type="checkbox" id="bargein"> Let me interrupt (headphones)</label>
+        <label title="Listens automatically when you speak"><input type="checkbox" id="handsfree" checked> Hands-free</label>
+        <label title="Speak over the agent to cut it off (use headphones)"><input type="checkbox" id="bargein"> Allow interrupt</label>
       </div>
       <div id="chat">
-        <div class="empty"><div><b>No call yet</b>Pick a seller, check the use case, then press <i>Start call</i>.<br>Then just speak into the mic.</div></div>
+        <div class="empty"><div><b>No call yet</b>Pick a seller and press Start call.</div></div>
       </div>
     </div>
   </section>
@@ -268,11 +270,11 @@
   <!-- 3 · insights -->
   <section class="col">
     <div class="card" id="personaCard">
-      <div class="card-h"><h2>3 · Active persona</h2><span class="reason">decided live</span></div>
-      <div class="badge" id="badge"><div class="nm">—</div><div class="ds">Start a call to see the persona</div></div>
+      <div class="card-h"><h2>3 · Active persona</h2></div>
+      <div class="badge" id="badge"><div class="nm">—</div><div class="ds">Starts with the call</div></div>
       <div class="tl" id="timeline"></div>
       <div class="sublabel">Behaviour Analyst</div>
-      <div id="analyst" class="reason">Reads the transcript after every seller turn. Waiting for the seller…</div>
+      <div id="analyst" class="reason">—</div>
       <div class="reason" id="timings" style="margin-top:6px"></div>
     </div>
     <div class="card grow" id="insights">
@@ -285,23 +287,23 @@
       </div>
       <div class="pane on" data-g="ins" data-t="flow"><div class="pane-body">
         <div class="sublabel" id="flowLabel" style="margin-top:0">Call flow</div>
-        <div id="flow" class="reason">The agent moves through these stages as the conversation allows, not in a fixed script.</div>
+        <div id="flow" class="reason">—</div>
       </div></div>
       <div class="pane" data-g="ins" data-t="caller"><div class="pane-body">
         <div class="sublabel" style="margin-top:0">Live caller persona</div>
-        <div id="profile" class="reason">Builds up from the caller's words, language and speaking speed after every turn.</div>
+        <div id="profile" class="reason">—</div>
       </div></div>
       <div class="pane" data-g="ins" data-t="voice"><div class="pane-body">
         <div class="sublabel" style="margin-top:0">Delivery settings now</div>
-        <div class="kv" id="settings"><div class="reason" style="grid-column:1/-1">Shown once the call starts. Changed values turn amber.</div></div>
+        <div class="kv" id="settings"><div class="reason" style="grid-column:1/-1">—</div></div>
       </div></div>
       <div class="pane" data-g="ins" data-t="log"><div class="pane-body">
         <div class="card-h"><div class="sublabel" style="margin:0">Persona switch log</div><button class="sec sm" onclick="downloadLog()">Download JSON</button></div>
         <table><thead><tr><th>#</th><th>Switch</th><th>Seller state · evidence</th><th>Reason · change</th></tr></thead><tbody id="log"></tbody></table>
       </div></div>
       <div class="pane" data-g="ins" data-t="spec"><div class="pane-body">
-        <div class="sublabel" style="margin-top:0">Persona spec with reasons</div>
-        <div id="spec" class="reason">Pick a seller to see the persona built from their data.</div>
+        <div class="sublabel" style="margin-top:0">Persona spec</div>
+        <div id="spec" class="reason">Pick a seller.</div>
       </div></div>
     </div>
   </section>
@@ -357,27 +359,27 @@ function sellerCard(s) {
   CARDS[s.key] = s;
   if (s.dnc) return `<div class="seller off"><div class="top"><span class="nm">${esc(s.key.replace(/^f:/, ''))}</span><span class="tag">do not call</span></div><div class="reason clamp">${esc(s.summary)}</div></div>`;
   const uc = s.use_case, name = sellerName(s, s.key);
-  const tags = uc ? `<span class="tag moderate">${esc(uc.name)}</span> <span class="tag">${esc(uc.archetype)}</span>` : `<span class="tag">confidence: ${esc(s.confidence)}</span>`;
-  const line = uc ? (uc.requirement ? `<b>Needs:</b> ${esc(uc.requirement)}` : esc(uc.reason)) : esc(s.summary);
+  const [company, person] = name.split(' / ');
+  const tags = uc ? `<span class="tag moderate">${esc(uc.name)}</span><span class="tag">${esc(uc.archetype)}</span>` : `<span class="tag">confidence: ${esc(s.confidence)}</span>`;
+  const line = uc ? uc.requirement : s.summary;
   return `<div class="seller" data-k="${esc(s.key)}" onclick="pick('${esc(s.key)}')">
-      <div class="top"><span class="nm" title="${esc(name)}">${esc(name)}</span></div>
+      <div class="top"><span class="nm" title="${esc(company)}">${esc(company)}</span></div>
+      ${person ? `<div class="person">${esc(person)}</div>` : ''}
       <div class="tagrow">${tags}</div>
-      <div class="reason clamp">${line}</div>
-      <div class="starts">starts as <b>${esc(s.start_persona)}</b></div>
+      ${line ? `<div class="reason clamp">${esc(line)}</div>` : ''}
+      <div class="starts">Starts as <b>${esc(s.start_persona)}</b></div>
       <div class="more">
-        ${uc ? `<div class="reason"><i>${esc(uc.reason)}</i></div>` : ''}
-        <div class="reason">${esc(s.start_reason)}</div>
         <div class="chips">${Object.entries(s.settings).map(([k,v]) => `<span class="chip">${k}: ${esc(v)}</span>`).join('')}</div>
       </div></div>`;
 }
 function renderWho() {
   const el = document.getElementById('who');
   if (document.getElementById('mode').value === 'buyer') {
-    el.innerHTML = `<div class="av">B</div><div style="min-width:0"><b>Buyer help desk</b><div class="reason clamp1">A buyer calls in; the agent helps them find the right product.</div></div>`;
+    el.innerHTML = `<div class="av">B</div><div style="min-width:0"><b>Buyer help desk</b></div>`;
     return;
   }
   if (!SELLER) {
-    el.innerHTML = `<div class="av">?</div><div style="min-width:0"><b>No seller selected</b><div class="reason clamp1">Pick one from the list to build their persona.</div></div>`;
+    el.innerHTML = `<div class="av">?</div><div style="min-width:0"><b>No seller selected</b></div>`;
     return;
   }
   const s = CARDS[SELLER], uc = s && s.use_case, name = sellerName(s, SELLER);
@@ -386,14 +388,10 @@ function renderWho() {
 }
 function renderFile(f) {
   document.getElementById('fileName').textContent = f.name
-    ? `${f.name} · ${f.format ? 'read as ' + f.format + ' · ' : ''}${f.sellers.length} sellers`
-    : 'CSV, JSON, Excel or XML · drop a file here · one seller per row';
-  const routes = Object.entries(f.routing || {});
-  document.getElementById('fileRouting').innerHTML = routes.length
-    ? 'Routed to: ' + routes.map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join(' ') : '';
+    ? `${f.name} · ${f.format ? f.format + ' · ' : ''}${f.sellers.length} sellers` : 'CSV · JSON · Excel · XML';
   document.getElementById('nFile').textContent = f.sellers.length;
   document.getElementById('fileSellers').innerHTML = f.sellers.length ? f.sellers.map(sellerCard).join('')
-    : '<div class="empty-list">No seller file yet. Upload one, or press <b>Load sample</b>.</div>';
+    : '<div class="empty-list">Upload a seller file or load the sample.</div>';
   document.querySelectorAll('.seller').forEach(e => e.classList.toggle('sel', e.dataset.k === SELLER));
   filterList('fileSellers', document.getElementById('qFile').value);
 }
@@ -683,7 +681,7 @@ async function startCall() {
   if (!SELLER && mode !== 'buyer') return;
   document.getElementById('chat').innerHTML = ''; document.getElementById('log').innerHTML = ''; document.getElementById('nLog').textContent = '0';
   ended = false; busy = true; PREV_PROFILE = null; PENDING = false; INTERRUPTED = false; status('calling…', 'thinking');
-  document.getElementById('analyst').textContent = 'waiting for the caller…';
+  document.getElementById('analyst').textContent = 'Waiting for the caller…';
   setStep(3); tab('ins', 'flow');
   try {
     await ensureMic();
