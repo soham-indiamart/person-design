@@ -1,5 +1,5 @@
 # Render blueprint for the PS04 live voice demo (python -m vani_persona.ps04.server).
-# Secrets are not stored here: set SARVAM_API_KEY and DEMO_PASSWORD in the Render dashboard.
+# Secrets are not stored here: set SARVAM_API_KEY in the Render dashboard.
 services:
   - type: web
     name: vani-persona-demo
@@ -13,8 +13,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.7
       - key: SARVAM_API_KEY
-        sync: false
-      - key: DEMO_PASSWORD
         sync: false
       - key: SARVAM_CREDIT_LIMIT
         value: "400"

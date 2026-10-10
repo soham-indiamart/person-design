@@ -6,15 +6,13 @@
 Standard library only. Binds to localhost by default. Seller data stays on this machine;
 only the call audio/text of the demo itself is sent to Sarvam.
 
-Hosted (e.g. Render): ``HOST``/``PORT`` set the bind address, and ``DEMO_PASSWORD`` (if set)
-puts every page and API behind HTTP basic auth so strangers cannot spend Sarvam credits.
+Hosted (e.g. Render): ``HOST``/``PORT`` set the bind address.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
-import hmac
 import json
 import os
 import threading
@@ -126,19 +124,8 @@ def _card(key: str, spec: dict) -> dict:
     }
 
 
-def make_handler(state: State, password: str | None = None):
-    expected = "Basic " + base64.b64encode(f"vani:{password}".encode()).decode() if password else None
-
+def make_handler(state: State):
     class H(BaseHTTPRequestHandler):
-        def _authorized(self) -> bool:
-            if expected is None or hmac.compare_digest(self.headers.get("Authorization", ""), expected):
-                return True
-            self.send_response(HTTPStatus.UNAUTHORIZED)
-            self.send_header("WWW-Authenticate", 'Basic realm="VANI persona demo"')
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return False
-
         def log_message(self, fmt, *args):  # keep the console readable
             if "/api/" in (str(args[0]) if args else ""):
                 super().log_message(fmt, *args)
@@ -151,7 +138,7 @@ def make_handler(state: State, password: str | None = None):
                 return
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
         def do_OPTIONS(self):
             self.send_response(HTTPStatus.NO_CONTENT)
@@ -216,8 +203,6 @@ def make_handler(state: State, password: str | None = None):
         def do_GET(self):
             if self.path == "/healthz":
                 return self._json({"ok": True})
-            if not self._authorized():
-                return
             u = urlparse(self.path)
             q = parse_qs(u.query)
             try:
@@ -268,8 +253,6 @@ def make_handler(state: State, password: str | None = None):
                 self._json({"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         def do_POST(self):
-            if not self._authorized():
-                return
             u = urlparse(self.path)
             q = parse_qs(u.query)
             try:
@@ -367,9 +350,8 @@ def main() -> None:
     ap.add_argument("--root", type=Path, default=Path("."))
     args = ap.parse_args()
     sarvam.api_key()  # fail fast if the key is missing
-    password = os.environ.get("DEMO_PASSWORD") or None
-    srv = ThreadingHTTPServer((args.host, args.port), make_handler(State(args.root), password))
-    print(f"VANI persona demo on http://{args.host}:{args.port}" + (" (password protected)" if password else ""))
+    srv = ThreadingHTTPServer((args.host, args.port), make_handler(State(args.root)))
+    print(f"VANI persona demo on http://{args.host}:{args.port}")
     srv.serve_forever()
 
 
