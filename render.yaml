@@ -1,0 +1,20 @@
+# Render blueprint for the PS04 live voice demo (python -m vani_persona.ps04.server).
+# Secrets are not stored here: set SARVAM_API_KEY and DEMO_PASSWORD in the Render dashboard.
+services:
+  - type: web
+    name: vani-persona-demo
+    runtime: python
+    plan: free
+    # Editable install keeps REPO_ROOT pointing at the checkout (personas/, evidence/, samples/).
+    buildCommand: pip install -e .
+    startCommand: python -m vani_persona.ps04.server --host 0.0.0.0
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: DEMO_PASSWORD
+        sync: false
+      - key: SARVAM_CREDIT_LIMIT
+        value: "400"

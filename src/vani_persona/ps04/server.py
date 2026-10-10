@@ -3,15 +3,20 @@
     python -m vani_persona.ps04.server [--port 8765] [--root .]
     then open http://localhost:8765
 
-Standard library only. Binds to localhost. Seller data stays on this machine; only the
-call audio/text of the demo itself is sent to Sarvam.
+Standard library only. Binds to localhost by default. Seller data stays on this machine;
+only the call audio/text of the demo itself is sent to Sarvam.
+
+Hosted (e.g. Render): ``HOST``/``PORT`` set the bind address, and ``DEMO_PASSWORD`` (if set)
+puts every page and API behind HTTP basic auth so strangers cannot spend Sarvam credits.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import hmac
 import json
+import os
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -37,7 +42,8 @@ class State:
     def __init__(self, root: Path):
         self.root = root
         self.sessions: dict[str, CallSession] = {}
-        self.demo = json.loads((ART / "demo_sellers.json").read_text(encoding="utf-8"))
+        demo_p = ART / "demo_sellers.json"   # generated from the PS07 export; absent on a fresh deploy
+        self.demo = json.loads(demo_p.read_text(encoding="utf-8")) if demo_p.exists() else {}
         shared_p = ART / "shared_policy.json"
         self.shared = json.loads(shared_p.read_text(encoding="utf-8")) if shared_p.exists() else None
         self._sellers = None
@@ -106,14 +112,30 @@ def _card(key: str, spec: dict) -> dict:
     }
 
 
-def make_handler(state: State):
+def make_handler(state: State, password: str | None = None):
+    expected = "Basic " + base64.b64encode(f"vani:{password}".encode()).decode() if password else None
+
     class H(BaseHTTPRequestHandler):
+        def _authorized(self) -> bool:
+            if expected is None or hmac.compare_digest(self.headers.get("Authorization", ""), expected):
+                return True
+            self.send_response(HTTPStatus.UNAUTHORIZED)
+            self.send_header("WWW-Authenticate", 'Basic realm="VANI persona demo"')
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return False
+
         def log_message(self, fmt, *args):  # keep the console readable
-            if "/api/" in (args[0] if args else ""):
+            if "/api/" in (str(args[0]) if args else ""):
                 super().log_message(fmt, *args)
 
         def _set_cors(self):
-            self.send_header("Access-Control-Allow-Origin", "*")
+            # The UI is served from this server, so it needs no CORS; a wildcard would let any
+            # website drive the API (and spend credits). Allow one extra origin only if configured.
+            origin = os.environ.get("CORS_ORIGIN")
+            if not origin:
+                return
+            self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -174,6 +196,10 @@ def make_handler(state: State):
                 pass  # the browser hung up mid-reply
 
         def do_GET(self):
+            if self.path == "/healthz":
+                return self._json({"ok": True})
+            if not self._authorized():
+                return
             u = urlparse(self.path)
             q = parse_qs(u.query)
             try:
@@ -224,6 +250,8 @@ def make_handler(state: State):
                 self._json({"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
         def do_POST(self):
+            if not self._authorized():
+                return
             u = urlparse(self.path)
             q = parse_qs(u.query)
             try:
@@ -289,12 +317,14 @@ def make_handler(state: State):
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8765)))
     ap.add_argument("--root", type=Path, default=Path("."))
     args = ap.parse_args()
     sarvam.api_key()  # fail fast if the key is missing
-    srv = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(State(args.root)))
-    print(f"VANI persona demo on http://localhost:{args.port}")
+    password = os.environ.get("DEMO_PASSWORD") or None
+    srv = ThreadingHTTPServer((args.host, args.port), make_handler(State(args.root), password))
+    print(f"VANI persona demo on http://{args.host}:{args.port}" + (" (password protected)" if password else ""))
     srv.serve_forever()
 
 
