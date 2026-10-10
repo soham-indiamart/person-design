@@ -44,10 +44,18 @@ def test_contrasting_sellers_get_different_personas():
     south = generate(row(seller_state="Tamil Nadu"), EVIDENCE)
     assert [s["seller_type"] for s in (new, rushed, formal)] == ["new_receptive", "time_pressed", "established_formal"]
     assert new["voice"]["speaker"]["value"] != rushed["voice"]["speaker"]["value"]
-    assert rushed["voice"]["pace"]["value"] > new["voice"]["pace"]["value"]
+    # Every call starts at pace 1.0; the live persona moves it.
+    assert {s["voice"]["pace"]["value"] for s in (new, rushed, formal, south)} == {1.0}
     assert formal["language"]["formality"]["value"] == "formal"
-    assert south["language"]["primary"]["value"] == "en-IN"
-    assert south["language"]["switch_candidate"]["value"] == "ta-IN"
+    assert south["language"]["primary"]["value"] == "ta-IN"
+    assert south["language"]["switch_candidate"]["value"] == "hi-IN"
+
+
+def test_south_starts_native_north_starts_hindi():
+    for state, lang in [("Telangana", "te-IN"), ("Andhra Pradesh", "te-IN"), ("Kerala", "ml-IN"),
+                        ("Karnataka", "kn-IN"), ("Tamil Nadu", "ta-IN"), ("Uttar Pradesh", "hi-IN"),
+                        ("Delhi", "hi-IN"), ("Punjab", "hi-IN"), ("Rajasthan", "hi-IN")]:
+        assert generate(row(seller_state=state), EVIDENCE)["language"]["primary"]["value"] == lang, state
 
 
 def test_missing_fields_lower_confidence_and_dnc_suppresses():
@@ -453,6 +461,82 @@ def test_instant_ack_and_no_repeats(monkeypatch, tmp_path):
     s.turns = [Turn("bot", "जी सर, meeting कल रख लेते हैं।"), Turn("bot", "जी सर, meeting कल रख लेते हैं ना?")]
     hint = s._avoid_repeats()
     assert "'जी सर'" in hint and "meeting कल रख" in hint
+
+
+def test_wants_to_end_detects_goodbye_but_not_thanks_with_more():
+    from vani_persona.ps04.signals import wants_to_end
+
+    for said in ["ok thank you", "theek hai ji, sab clear, dhanyavaad", "chalo rakhta hoon", "bye bye",
+                 "धन्यवाद जी", "बस इतना ही, शुक्रिया", "that's all, thanks", "நன்றி", "సరే ధన్యవాదాలు"]:
+        assert wants_to_end([said])[0], said
+    for said in ["thank you, aur ek baat, ye free hai kya", "thanks but price kitna hai?",
+                 "haan ji bataiye", "achha thank you, lekin leads to aate hi nahi hain mere paas bilkul bhi"]:
+        assert not wants_to_end([said])[0], said
+
+
+def test_call_ends_with_a_thank_you_when_the_seller_wraps_up(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live, sarvam
+    from vani_persona.ps04.live import CallSession, Turn
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    monkeypatch.setattr(live.CallSession, "warm_acks", lambda self: None)
+    s = CallSession(generate(row(), EVIDENCE))
+    s.turns = [Turn("bot", "नमस्ते, मैं IndiaMART से पायल बोल रही हूँ।"), Turn("seller", "haan ji boliye"),
+               Turn("bot", "आपकी leads के बारे में बात करनी थी।")]
+    seen = {}
+
+    def chat(msgs, **k):
+        if "SOUND HUMAN" in msgs[0]["content"]:
+            seen["msgs"] = msgs
+            return "आपका बहुत धन्यवाद जी, कभी भी ज़रूरत हो तो बताइए। नमस्ते!\n##HANGUP##", 5
+        return "{}", 5
+    monkeypatch.setattr(sarvam, "chat", chat)
+    r = s.seller_text("theek hai ji, sab samajh gaya, thank you", "hi-IN", stream=True,
+                      on_ack=lambda t, w: None)
+    assert r["ended"] and s.ended and r["ack"] is None
+    assert "wrapping up" in seen["msgs"][-1]["content"]
+    assert "धन्यवाद" in r["reply"] and "HANGUP" not in r["reply"]
+    assert "thank you" in r["outcome"]["ended_by"]
+
+    # Even if the model forgets the tag or asks one more thing, the seller is done: end with a thank-you.
+    s2 = CallSession(generate(row(), EVIDENCE))
+    s2.turns = list(s.turns[:3])
+    monkeypatch.setattr(sarvam, "chat", lambda msgs, **k: ("aur kuch madad chahiye?", 5))
+    r2 = s2.seller_text("ok bye", "hi-IN", stream=True)
+    assert r2["ended"] and r2["reply"] == live.GOODBYE_NOTE["hi-IN"]
+
+
+def test_loose_tags_after_a_marked_tag_are_never_spoken():
+    from vani_persona.ps04.live import mark_tags
+
+    assert mark_tags("Arjun? ##STAGE: identify## NOTE: seller=Arjun Nair").endswith("##NOTE: seller=Arjun Nair##")
+    assert mark_tags("ok ## NOTE: a=b ##") == "ok ## NOTE: a=b ##"
+    assert "##NOTE: x=y##" in mark_tags("bye #NOTE: x=y#")
+
+
+def test_regional_call_follows_the_seller_into_english_or_hindi():
+    t = "Actually, we moved to TradeIndia because the buyers were not serious"
+    assert LanguageTracker("ml-IN").update(None, None, [t, t], len(t.split())).detail["to"] == "en-IN"
+    h = "haan ji theek hai bhai abhi baat karo"
+    assert LanguageTracker("ta-IN").update(None, None, [h, h], len(h.split())).detail["to"] == "hi-IN"
+    m = "ശരി, പറഞ്ഞോളൂ സാർ ഇപ്പോൾ"
+    assert LanguageTracker("ml-IN").update(None, None, [m, m], len(m.split())) is None
+    # Back in English, an analyst guess alone does not pull the call back into Malayalam.
+    e = "Okay, that sounds fine. Thank you so much"
+    assert LanguageTracker("en-IN").update(None, None, [e, e], len(e.split()), hint="ml-IN") is None
+
+
+def test_pace_starts_at_one_and_moves_with_the_persona(monkeypatch, tmp_path):
+    from vani_persona.ps04 import live
+    from vani_persona.ps04.live import CallSession
+
+    monkeypatch.setattr(live, "LOG_DIR", tmp_path)
+    for state in (None, "Tamil Nadu", "Gujarat"):
+        s = CallSession(generate(row(seller_state=state), EVIDENCE))
+        assert s.settings.pace == 1.0, state
+        assert s.compose("de_escalator", s.profile).pace < 1.0
+        assert s.compose("quick_direct", s.profile).pace > 1.0
+        assert s.compose(s.persona_id, s.profile).pace == 1.0
 
 
 def test_trim_rambling_keeps_the_point_and_question():

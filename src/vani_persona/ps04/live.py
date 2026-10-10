@@ -40,7 +40,8 @@ from vani_persona.ps04.director import PersonaDirector
 from vani_persona.ps04.flows import HUMAN_TOUCH, flow_card, flow_for
 from vani_persona.ps04.live_personas import PERSONAS, starting_persona
 from vani_persona.ps04.profile import LiveProfile, apply_profile, profile_from_settings
-from vani_persona.ps04.signals import END_PATTERN, Detection, LanguageTracker, looks_incomplete, pace_request
+from vani_persona.ps04.signals import (END_PATTERN, Detection, LanguageTracker, looks_incomplete, pace_request,
+                                       wants_to_end)
 
 MEETING_MODES = ("seller", "win_back")   # flows that end in a booked meeting (##MEETING## tag)
 
@@ -58,14 +59,15 @@ MIX_TEXT = {
 }
 SCRIPT_TEXT = {
     "hi-IN": "Write Hindi words in Devanagari and English words in Latin script.",
-    "en-IN": "Write in English (Latin script).",
+    "en-IN": "Write in English (Latin script) only: no words or script from any other language.",
 }
 LENGTH_WORDS = {"normal": 28, "short": 18, "very_short": 12}
 
 # How a person talks on the phone, for every journey (the flow's own style lines come on top).
 HUMAN_SPEECH = (
-    "Talk the way people talk on a phone call, not the way they write: short spoken sentences, everyday Hinglish "
-    "(achha, dekhiye, haan toh, matlab, bas), English business words in English.",
+    "Talk the way people talk on a phone call, not the way they write: short spoken sentences, the everyday spoken "
+    "form of the language you are speaking (in Hindi: achha, dekhiye, haan toh, matlab, bas), English business "
+    "words in English.",
     "Never use bookish Hindi: say shukriya / thank you, not dhanyavad; madad / help, not sahayata; "
     "'koi baat nahi', not 'koi samasya nahi'; never 'svabhavik', 'khed', 'kripya', 'avashya', 'upalabdh'.",
     "Do not follow one template every time (acknowledge + repeat + question). Sometimes just answer, sometimes just "
@@ -81,8 +83,19 @@ HUMAN_SPEECH = (
 )
 # One instant spoken acknowledgement while the reply is being written, so there is no dead air.
 ACKS = {"hi-IN": ("अच्छा।", "जी, अच्छा।", "अच्छा जी।", "हाँ जी।", "ठीक है जी।"),
-        "en-IN": ("Okay.", "Right.", "I see.", "Got it.", "Okay, sure.")}
-ACK_MIN_WORDS = 4          # "haan" / "ok" get no acknowledgement: the reply itself follows at once
+        "en-IN": ("Okay.", "Right.", "I see.", "Got it.", "Okay, sure."),
+        "ta-IN": ("சரி.", "சரி, சரி."), "te-IN": ("సరే.", "అలాగే."),
+        "kn-IN": ("ಸರಿ.", "ಸರಿ, ಸರಿ."), "ml-IN": ("ശരി.", "ശരി, ശരി.")}
+ACK_MIN_WORDS = 4
+# Said if the model's goodbye is empty or still asks something.
+GOODBYE_NOTE = {
+    "hi-IN": "आपका बहुत-बहुत धन्यवाद जी, आपने समय दिया। कभी भी ज़रूरत हो तो IndiaMART हाज़िर है। नमस्ते!",
+    "en-IN": "Thank you so much for your time. IndiaMART is always here whenever you need us. Have a great day!",
+    "ta-IN": "உங்கள் நேரத்திற்கு மிக்க நன்றி. எப்போது தேவைப்பட்டாலும் IndiaMART உங்களுடன் இருக்கும். வணக்கம்!",
+    "te-IN": "మీ సమయానికి చాలా ధన్యవాదాలు. ఎప్పుడు అవసరమైనా IndiaMART మీకు అందుబాటులో ఉంటుంది. నమస్కారం!",
+    "kn-IN": "ನಿಮ್ಮ ಸಮಯಕ್ಕೆ ತುಂಬಾ ಧನ್ಯವಾದಗಳು. ಯಾವಾಗ ಬೇಕಾದರೂ IndiaMART ನಿಮ್ಮೊಂದಿಗಿದೆ. ನಮಸ್ಕಾರ!",
+    "ml-IN": "നിങ്ങളുടെ സമയത്തിന് വളരെ നന്ദി. എപ്പോൾ ആവശ്യമുണ്ടെങ്കിലും IndiaMART കൂടെയുണ്ട്. നമസ്കാരം!",
+}          # "haan" / "ok" get no acknowledgement: the reply itself follows at once
 ACK_CACHE: dict[tuple, bytes] = {}
 # Pure acknowledgements only: a leading "haan" / "bilkul" can be the answer itself ("yes, it is free").
 LEADING_ACK = re.compile(r"^\s*((जी|अच्छा|ठीक है|ji|achha|acha|accha|theek hai|okay|ok|right)(?=[\s,।.!])[\s,।.!]*){1,2}",
@@ -201,7 +214,21 @@ def drop_repeats_once(text: str, said_before: str) -> str:
     return re.sub(r",\s*$", "।" if re.search(r"[\u0900-\u097F]", out) else ".", out)
 
 
-UNMARKED_TAG = re.compile(r"(?<!#)(?<!# )\b(NOTE|STAGE|MEETING)\s*:\s*([^\n#]+)")
+MARKED_TAG = re.compile(r"##\s*(?:NOTE|STAGE|MEETING|HANGUP)\b[^#]*##")
+UNMARKED_TAG = re.compile(r"#{0,2}\s?\b(NOTE|STAGE|MEETING)\s*:\s*([^\n#\x00]+)#*")
+
+
+def mark_tags(content: str) -> str:
+    """Wrap tags the model wrote without (or with half) their ## markers, so they are never spoken."""
+    kept: list[str] = []
+
+    def keep(m: re.Match) -> str:
+        kept.append(m.group(0))
+        return f"\x00{len(kept) - 1}\x00"
+    content = MARKED_TAG.sub(keep, content)
+    content = UNMARKED_TAG.sub(lambda m: f" ##{m.group(1)}: {m.group(2).strip()}##", content)
+    content = re.sub(r"(?<!#)\bHANGUP\b", "##HANGUP##", content)
+    return re.sub(r"\x00(\d+)\x00", lambda m: kept[int(m.group(1))], content)
 
 
 def split_speech(text: str) -> list[str]:
@@ -233,6 +260,9 @@ class CallSession:
             self.persona_id, self.start_reason = starting_persona(spec)
         # Persona to settle back into when the seller is calm: what the use case and archetype call for.
         self.rest_persona = (spec.get("use_case") or {}).get("start_persona") or "normal"
+        # These speak at the default pace; a switch away to another persona brings in its faster / slower pace.
+        self.home_personas = {self.persona_id, self.rest_persona}
+        self.closing: str | None = None      # why the call is being wrapped up, once the caller signals it
         self.profile: LiveProfile = profile_from_settings(self.base.language, self.base.mix, self.base.formality,
                                                           spec.get("seller_type", ""))
         self.unvoiced: str | None = None  # a language Saaras understands but Bulbul cannot speak
@@ -286,6 +316,8 @@ class CallSession:
         s = copy.deepcopy(self.base)
         s.language, s.mix = profile.language, profile.mix
         apply_persona(s, self.base, persona_id, self.flow.mode)
+        if persona_id in self.home_personas:
+            s.pace = self.base.pace
         apply_profile(s, profile)
         if self.unvoiced:
             s.mix, s.vocabulary = "hindi_heavy", "simple"
@@ -373,10 +405,11 @@ After the spoken words add ##STAGE: <stage id>## for the flow stage this reply w
 Only on your final goodbye (goal reached, {who} refused per the rules, or asked not to be called), append ##HANGUP##.{meeting_tag}"""
 
     def _messages(self, s: LiveSettings | None = None, persona_id: str | None = None,
-                  escalate: bool | None = None) -> list[dict]:
+                  escalate: bool | None = None, closing: str | None = None) -> list[dict]:
         s = s or self.settings
         persona_id = persona_id or self.persona_id
         escalate = self.escalate if escalate is None else escalate
+        closing = closing or self.closing
         msgs = [{"role": "system", "content": self.system_prompt(s, persona_id, escalate)}]
         who = self.flow.counterpart
         for t in self.turns:
@@ -402,6 +435,14 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
         # Restate the live settings last: models follow the latest instruction over the history's language.
         lang_name = sarvam.ALL_LANGUAGES.get(s.language, s.language)
         script = SCRIPT_TEXT.get(s.language, f"Use {lang_name} script.")
+        if closing:
+            meeting = f" Confirm the meeting once: {self.outcome['meeting']}." if self.outcome.get("meeting") else ""
+            msgs.append({"role": "system", "content": (
+                f"The {who} is wrapping up the call ({closing}). Reply in {lang_name} only. {script} End the call "
+                "now, warmly, in at most 25 words: thank them for their time, say IndiaMART is there whenever they "
+                f"need anything, and say goodbye.{meeting} No question, no new topic, no pitch. Then, on a new line, "
+                "##HANGUP##")})
+            return msgs
         ack = (f" You have already said '{self.ack}' out loud just now: carry straight on, without another "
                "acknowledgement (no ji / achha / theek hai at the start)." if self.ack else "")
         msgs.append({"role": "system", "content": (
@@ -469,13 +510,13 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
         wavs = [w for _, w, _ in self.speech_chunks(text, s)]
         return join_wavs(wavs), int((time.perf_counter() - t0) * 1000)
 
-    def _generate(self, s: LiveSettings, persona_id: str, escalate: bool) -> tuple[str, int]:
-        return sarvam.chat(self._messages(s, persona_id, escalate), max_tokens=280, temperature=0.6)
+    def _generate(self, s: LiveSettings, persona_id: str, escalate: bool,
+                  closing: str | None = None) -> tuple[str, int]:
+        return sarvam.chat(self._messages(s, persona_id, escalate, closing), max_tokens=280, temperature=0.6)
 
     def _finish(self, content: str, ms: int) -> tuple[str, dict]:
         # The model sometimes drops the ## markers; never speak a tag out loud.
-        content = UNMARKED_TAG.sub(lambda m: f"##{m.group(1)}: {m.group(2).strip()}##", content)
-        content = re.sub(r"(?<!#)\bHANGUP\b", "##HANGUP##", content)
+        content = mark_tags(content)
         meeting = re.search(r"##\s*MEETING:\s*([^<>#]+?)\s*##", content)
         if meeting and re.search(r"pending|unknown|tbd|day and time", meeting.group(1), re.I):
             meeting = None
@@ -494,6 +535,12 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
                    or (last_seller is not None and any(END_PATTERN.search(normalize(x or "")) for x in
                                                        (last_seller.text, last_seller.meta.get("romanized")))))
         end = "HANGUP" in content and may_end and not text.rstrip().endswith("?")
+        if self.closing:
+            # The caller is done: the call ends on this reply whatever the model wrote.
+            if not text or text.rstrip().endswith("?"):
+                text = GOODBYE_NOTE.get(self.settings.language, GOODBYE_NOTE["en-IN"])
+            end = True
+            self.outcome.setdefault("ended_by", f"{self.flow.counterpart} wrapped up the call: {self.closing}")
         if meeting:
             self.outcome["meeting"] = meeting.group(1).strip()
         notes = self.flow_state["notes"]
@@ -640,11 +687,14 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
             return {"transcript": native, "romanized": roman, "wait": True, "wait_reason": why, "switches": [],
                     "settings": self.settings.as_dict(), "timings": timings}
         self.waits = 0
-        ack = self.pick_ack(native) if on_ack else None
+        turn_no = sum(t.role == "seller" for t in self.turns) + 1
+        done, done_phrase = wants_to_end([native, roman])
+        if done and turn_no >= 2 and not self.closing:
+            self.closing = f"they said '{done_phrase}'"
+        ack = self.pick_ack(native) if on_ack and not self.closing else None
         self.ack = ack[0] if ack else None
         if ack:
             on_ack(*ack)
-        turn_no = sum(t.role == "seller" for t in self.turns) + 1
         self.turns.append(Turn("seller", native, {"romanized": roman, "language": lang, "language_probability": prob,
                                                   "audio_s": audio_s}))
         texts, n_words = [native, roman], len(native.split())
@@ -657,13 +707,16 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
             draft_profile.language = draft_lang
             draft_profile.mix = mix_for(draft_lang, None, self.profile.mix, self.base.mix)
         draft_settings = self.compose(self.persona_id, draft_profile)
-        draft_key = (self.persona_id, self.escalate, tuple(getattr(draft_settings, k) for k in TEXT_KEYS))
-        f_draft = POOL.submit(self._generate, draft_settings, self.persona_id, self.escalate)
+        draft_key = (self.persona_id, self.escalate, bool(self.closing),
+                     tuple(getattr(draft_settings, k) for k in TEXT_KEYS))
+        f_draft = POOL.submit(self._generate, draft_settings, self.persona_id, self.escalate, self.closing)
 
         convo = [(t.role, t.text) for t in self.turns if t.role in ("bot", "seller")]
         prev = self.verdicts[-1] if self.verdicts else None
         v = analyse(convo, roman, self.persona_id, prev, self.use_llm_signals, self.flow.counterpart)
         self.verdicts.append(v)
+        if v.wants_to_end and turn_no >= 2 and not self.closing and "?" not in native:
+            self.closing = "the analyst heard them signal they are done: " + (v.evidence or native)[:80]
         timings["analyst_ms"] = int((time.perf_counter() - t0) * 1000)
 
         # 1. Language.
@@ -764,12 +817,13 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
         self.switch_log.extend(new_entries)
 
         # Keep the draft if the verdict did not change anything that shapes the text.
-        final_key = (self.persona_id, self.escalate, tuple(getattr(self.settings, k) for k in TEXT_KEYS))
+        final_key = (self.persona_id, self.escalate, bool(self.closing),
+                     tuple(getattr(self.settings, k) for k in TEXT_KEYS))
         if final_key == draft_key:
             content, llm_ms = f_draft.result()
             timings["draft_reused"] = True
         else:
-            content, llm_ms = self._generate(self.settings, self.persona_id, self.escalate)
+            content, llm_ms = self._generate(self.settings, self.persona_id, self.escalate, self.closing)
             timings["draft_reused"] = False
         text, meta = self._finish(content, llm_ms)
         ack, self.ack = self.ack, None

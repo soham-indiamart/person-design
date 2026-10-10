@@ -93,6 +93,7 @@ Then profile the seller as a person, from the whole conversation so far:
 - patience: low, medium or high,
 - formality: formal (aap, ji, sir, complete sentences) or casual (tum, yaar, bhai, short),
 - persona: 4-10 words describing who this seller seems to be right now (e.g. "busy shop owner, impatient, Hinglish").
+- wants_to_end: true only if the seller is wrapping up the call now: saying bye, thanking and signalling they are done or satisfied, or asking to hang up, with nothing left to ask. Thanks in the middle of the conversation, or thanks followed by a question or a new point, is false.
 
 Rules: judge the seller only, never Payal. Politeness alone is not interest. "Kaun?" or "who is this?" at the start is calm. If the seller was aggressive and now answers normally, that is calm with trend calming. Code-mixed Hinglish and any Indian language are normal. A complaint that Payal talks too slowly ("itna dheere kyu bol rahe ho", "too slow") is pace faster and state rushed, NOT confused. "Speak slowly", "aaram se boliye" is pace slower. Asking to speak another language is not confusion by itself.
 
@@ -108,8 +109,10 @@ Seller: "ye meeting free hai ya paid? isse kya fayda hoga?" -> {"state":"inquisi
 Seller: "dekhte hain, abhi soch ke batata hoon" -> {"state":"hesitant","intensity":0.65,"trend":"steady"}
 Seller: "nahi ji, humein nahi chahiye" -> {"state":"uninterested","intensity":0.8,"trend":"steady"}
 Seller: "Okay, tell me what this meeting is about" -> {"state":"calm","intensity":0.4,"language":"en-IN","pace":"same"}
+Seller: "theek hai ji, sab samajh aa gaya, thank you" -> {"state":"calm","intensity":0.3,"trend":"steady","wants_to_end":true}
+Seller: "achha thank you, ek baat aur, ye free hai na?" -> {"state":"inquisitive","intensity":0.6,"trend":"steady","wants_to_end":false}
 
-Return only JSON: {"state": "...", "intensity": 0.0, "trend": "...", "evidence": "...", "rationale": "...", "language": "...", "mix": "...", "pace": "...", "patience": "...", "formality": "...", "persona": "..."}"""
+Return only JSON: {"state": "...", "intensity": 0.0, "trend": "...", "evidence": "...", "rationale": "...", "language": "...", "mix": "...", "pace": "...", "patience": "...", "formality": "...", "persona": "...", "wants_to_end": false}"""
 
 PROFILE_VALUES = {
     "mix": {"hindi_heavy", "balanced", "english_heavy"},
@@ -130,6 +133,7 @@ class Verdict:
     lexicon: dict
     ms: int = 0
     profile: dict = field(default_factory=dict)   # language, mix, pace, patience, formality, persona
+    wants_to_end: bool = False
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -205,7 +209,7 @@ def analyse(turns: list[tuple[str, str]], romanized_latest: str, persona_id: str
                     str(o.get("trend", "steady")).lower() if str(o.get("trend", "")).lower() in
                     {"escalating", "steady", "calming"} else "steady",
                     str(o.get("evidence", ""))[:120], str(o.get("rationale", ""))[:200], "analyst", hits,
-                    profile=_profile(o))
+                    profile=_profile(o), wants_to_end=o.get("wants_to_end") in (True, "true", "True", 1))
     except (sarvam.SarvamError, ValueError, TypeError) as e:
         v = _lexicon_verdict(hits, f"analyst unavailable: {type(e).__name__}")
     v.ms = int((time.perf_counter() - t0) * 1000)

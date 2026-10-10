@@ -46,7 +46,11 @@ STATE_LANG = {
     "Telangana": "te-IN", "Andhra Pradesh": "te-IN", "Karnataka": "kn-IN", "Kerala": "ml-IN",
     "Odisha": "od-IN", "Punjab": "pa-IN", "Assam": "as-IN", "Goa": "kok-IN",
 }
-ENGLISH_FIRST_STATES = {"Tamil Nadu", "Kerala", "Karnataka"}
+# Southern sellers are opened in their own language (Bulbul has a voice for each); everyone else in Hindi.
+SOUTH_NATIVE = {"Tamil Nadu": "ta-IN", "Puducherry": "ta-IN", "Telangana": "te-IN", "Andhra Pradesh": "te-IN",
+                "Kerala": "ml-IN", "Lakshadweep": "ml-IN", "Karnataka": "kn-IN"}
+LANG_NAMES = {"ta-IN": "Tamil", "te-IN": "Telugu", "ml-IN": "Malayalam", "kn-IN": "Kannada"}
+DEFAULT_PACE = 1.0
 HIGH_TURNOVER = {"1.5 - 5 Cr", "5 - 25 Cr", "25 - 100 Cr", "100 - 500 Cr", "> 500 Cr"}
 VERY_HIGH_TURNOVER = {"5 - 25 Cr", "25 - 100 Cr", "100 - 500 Cr", "> 500 Cr"}
 
@@ -222,15 +226,14 @@ def generate(row: dict, evidence: dict) -> dict:
     # ---- language ------------------------------------------------------------------------
     lang_state = evidence.get("language_by_state", {}).get("stats", {}).get("by_state", {})
     st_share = lang_state.get(t["state"] or "", {}).get("english_leaning")
-    if t["state"] in ENGLISH_FIRST_STATES:
-        has_data = st_share is not None
+    native = SOUTH_NATIVE.get(t["state"] or "")
+    if native:
         primary = _setting(
-            "en-IN",
-            f"{t['state']}: " + (f"{st_share:.0%} of past sellers here spoke mostly English vs ~2% elsewhere."
-                                 if has_data else "southern state with little Hindi in past calls; English is the safer start."),
-            evidence, "language_by_state", "medium" if has_data else "low")
-        mix = _setting("english_heavy", "English sentences with a few common Hindi words.", evidence, "language_by_state",
-                       "medium" if has_data else "low")
+            native, f"{t['state']} (south): open in the seller's own language, {LANG_NAMES[native]}; the live "
+                    "language tracker switches to Hindi / English if the seller answers in it.",
+            evidence, "language_by_state", "medium")
+        mix = _setting("native", f"{LANG_NAMES[native]} with English business words where sellers use them.",
+                       evidence, "language_by_state", "medium")
     elif t["state"] is None:
         primary = _setting("hi-IN", "State missing: Hinglish is what 98% of past sellers spoke.", evidence, "language_by_state", "low")
         mix = _setting("hindi_heavy", "Default Hinglish.", evidence, "language_by_state", "low")
@@ -252,7 +255,12 @@ def generate(row: dict, evidence: dict) -> dict:
         evidence, ("limited_company" if t["business_type"] == "Limited Company" else "high_turnover") if formal else None,
         "medium" if t["business_type"] is not None else "low")
     regional = STATE_LANG.get(t["state"] or "")
-    switch_to = _setting(
+    if native:
+        switch_to = _setting("hi-IN", "Opened in the seller's own language; switch to Hindi or English as soon as "
+                                      "the seller speaks it.", evidence, "language_by_state", "low")
+    else:
+        switch_to = None
+    switch_to = switch_to or _setting(
         regional,
         (f"Prepared, not opened with: switch to {regional} only if the seller speaks it "
          f"({'voice available' if regional in TTS_LANGS else 'understood by Saaras; reply in Hindi/English, no TTS voice'})."
@@ -260,25 +268,16 @@ def generate(row: dict, evidence: dict) -> dict:
         evidence, "language_by_state", "low")
 
     # ---- voice ---------------------------------------------------------------------------
-    pace_val = {"calm": 0.92, "crisp": 1.12, "lively": 1.02}[energy]
-    if t["short_calls"] and energy != "calm":
-        pace_val = max(pace_val, 1.12)
-    if t["frustration"]:
-        pace_val = 0.9
-    pace_reason = {
-        0.9: "Slower and steady: this seller showed frustration before.",
-        0.92: "Slightly slower, unhurried delivery.",
-        1.12: "Brisker: this seller's past calls were short / they are likely busy.",
-        1.02: "Natural, upbeat pace.",
-    }[pace_val]
-    pace_key = ("past_frustration" if t["frustration"] else "short_call_history" if t["short_calls"]
-                else "high_turnover" if energy == "crisp" else None)
+    pace_val = DEFAULT_PACE
+    pace_reason = ("Every call starts at the default pace 1.0; the live persona and the seller's own speaking speed "
+                   "move it up or down during the call.")
+    pace_key = None
     voice = {
         "gender": _setting("female", "Continuity with VANI's existing identity (Payal); no past data compares voice genders.",
                            evidence, "voice_gender", "low"),
         "speaker": _setting(SPEAKERS[energy], f"{energy} delivery; one of Sarvam's top-rated voices across Indian languages.",
                             evidence, "voice_speaker", "low"),
-        "accent": _setting(primary["value"], "Accent follows the speaking language (Indian English or Hindi).",
+        "accent": _setting(primary["value"], "Accent follows the speaking language.",
                            evidence, "language_by_state", primary["confidence"]),
         "pitch": _setting({"calm": "lower", "crisp": "neutral", "lively": "higher"}[energy],
                           "Voice register for the tone. Sarvam bulbul:v3 has no pitch parameter (v2 is retired), "

@@ -643,7 +643,11 @@ function handle(r) {
   document.getElementById('timings').textContent = timingText(r.timings);
   if (r.credits) showCredits(r.credits);
   if (r.outcome && r.outcome.meeting) addMsg('bot', '✅ Meeting: ' + r.outcome.meeting);
-  if (r.ended) { ended = true; }
+  if (r.ended && !ended) {
+    ended = true; vadOn = false;
+    addMsg('bot', '📞 Call ended' + (r.outcome && r.outcome.ended_by ? ' · ' + r.outcome.ended_by : ''));
+    document.getElementById('endBtn').disabled = true;
+  }
 }
 
 async function startCall() {

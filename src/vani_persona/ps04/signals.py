@@ -122,6 +122,46 @@ def looks_incomplete(text: str) -> tuple[bool, str]:
     return False, ""
 
 
+# The caller is wrapping up. A goodbye always ends the call; thanks / "that's all" only when it is
+# short and does not lead into something else ("thank you, aur ek baat...").
+GOODBYE = [
+    "bye", "bye bye", "ok bye", "okay bye", "good bye", "goodbye", "alvida", "rakhta hoon", "rakhti hoon",
+    "rakhta hu", "rakhti hu", "phone rakhta", "phone rakhti", "phone rakh raha", "phone rakh rahi", "call rakhta",
+    "call rakhti", "baad mein baat karte", "baad me baat karte", "phir baat karte", "fir baat karte",
+    "chaliye phir", "chalo phir", "take care", "have a nice day", "talk later", "talk to you later",
+    "बाय", "रखता हूँ", "रखती हूँ", "रखता हूं", "रखती हूं", "फिर बात करते", "बाद में बात करते",
+]
+THANKS_DONE = [
+    "thank you", "thanks", "thank u", "thanku", "dhanyavad", "dhanyawad", "dhanyavaad", "shukriya", "bas itna hi",
+    "bas itna", "aur kuch nahi", "kuch aur nahi", "that's all", "thats all", "that is all", "nothing else",
+    "all good", "kaam ho gaya", "sab ho gaya", "bas ho gaya", "sab clear", "theek hai bas", "thik hai bas", "ok bas",
+    "धन्यवाद", "शुक्रिया", "थैंक यू", "थैंक्यू", "बस इतना ही", "और कुछ नहीं", "काम हो गया", "सब हो गया",
+    "nandri", "dhanyavadalu", "nanni", "dhanyavadagalu", "நன்றி", "ధన్యవాదాలు", "ధన్యవాదం", "ಧನ್ಯವಾದ", "നന്ദി",
+]
+CONTINUES = [
+    "lekin", "magar", "but", "aur ek", "ek aur", "ek baat", "ek sawal", "kya", "kaise", "kab", "kitna", "kitne",
+    "kaun", "what", "how", "when", "why", "which", "batao", "bataiye", "boliye", "suniye", "par ek",
+    "लेकिन", "मगर", "एक बात", "क्या", "कैसे", "कब", "कितना", "बताइए", "बताओ",
+]
+GOODBYE_PATTERN, THANKS_PATTERN, CONTINUES_PATTERN = _compile(GOODBYE), _compile(THANKS_DONE), _compile(CONTINUES)
+THANKS_MAX_WORDS = 10
+
+
+def wants_to_end(texts: list[str]) -> tuple[bool, str]:
+    """(True, phrase) if the caller is saying goodbye or signalling they are done and satisfied."""
+    for t in texts:
+        n = normalize(t or "")
+        m = GOODBYE_PATTERN.search(n)
+        if m:
+            return True, m.group(0)
+    for t in texts:
+        raw, n = (t or "").strip(), normalize(t or "")
+        m = THANKS_PATTERN.search(n)
+        if m and "?" not in raw and not CONTINUES_PATTERN.search(n) and len(n.split()) <= THANKS_MAX_WORDS:
+            return True, m.group(0)
+    return False, ""
+
+
 def pace_request(texts: list[str]) -> tuple[str | None, str]:
     """('faster' | 'slower' | None, matched phrase)."""
     for want in ("faster", "slower"):
@@ -149,6 +189,27 @@ def script_language(text: str) -> tuple[str | None, float]:
         return None, 0.0
     code = max(counts, key=counts.get)
     return code, counts[code] / letters
+
+
+HINGLISH_WORDS = _compile(["hai", "hain", "nahi", "haan", "kya", "mein", "aap", "theek", "achha", "bhai", "ji",
+                           "kar", "karo", "raha", "rahi", "tha", "thi", "bolo", "boliye", "matlab", "kyun", "abhi"])
+
+
+def hindi_or_english(text: str, saaras: str | None, hint: str | None) -> str | None:
+    """hi-IN / en-IN for a Devanagari or Latin utterance, else None."""
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return None
+    deva = sum("\u0900" <= ch <= "\u097f" for ch in letters) / len(letters)
+    latin = sum(ch.isascii() for ch in letters) / len(letters)
+    if deva >= 0.6:
+        return "hi-IN"
+    if latin < 0.8:
+        return None
+    for code in (saaras, hint):
+        if code in ("hi-IN", "en-IN"):
+            return code
+    return "hi-IN" if len(HINGLISH_WORDS.findall(normalize(text))) >= 2 else "en-IN"
 
 
 LLM_PROMPT = (
@@ -226,9 +287,19 @@ class LanguageTracker:
             return Detection("language_switch", round(share, 2), f"script:{to} {share:.0%} of letters",
                              texts[0], {"from": self.current, "to": to}), None
         saaras = detected if detected and (prob is None or prob >= MIN_LANG_PROB) else None
+        if self.current not in ("hi-IN", "en-IN") and not script and n_words >= self.MIN_FULL_SENTENCE:
+            # Saaras writes the southern / regional languages in their own script, so a full sentence in
+            # Devanagari or Latin means the seller has moved to Hindi or English.
+            to = hindi_or_english(texts[0] if texts else "", saaras, hint)
+            if to:
+                return Detection("language_switch", 0.9, f"script:{to} (left {self.current})", texts[0],
+                                 {"from": self.current, "to": to}), None
         candidate = saaras if saaras and saaras != self.current else hint if hint and hint != self.current else None
         if not candidate or n_words < 2:
             return None, None
+        if (candidate not in ("hi-IN", "en-IN") and saaras != candidate
+                and hindi_or_english(texts[0] if texts else "", None, None)):
+            return None, None   # a regional language is written in its own script, not Latin / Devanagari
         agree = saaras == candidate and hint == candidate
         pair = {candidate, self.current} <= {"hi-IN", "en-IN"}
         sure = (agree or (saaras == candidate and (prob or 0) >= self.SURE_PROB)
