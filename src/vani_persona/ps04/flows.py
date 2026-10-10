@@ -162,6 +162,10 @@ HUMAN_TOUCH = {
                         "reading out a ticket.",
     "catalogue_verification": "Brisk and practical, like checking a list together: 'pehla wala, ... abhi bhi "
                               "chal raha hai?'",
+    "issue_resolution_live": "Own the problem and fix it with them, like an RM with their account open: 'main abhi "
+                             "aapke account mein theek kar deti hoon'; say each change is done before moving on.",
+    "win_back_live": "Like their old account manager who can finally fix what went wrong: warm, specific, and making "
+                     "the changes while on the call, never desperate.",
     "win_back": "Like their old account manager reconnecting: genuine and warm ('kaafi time ho gaya'), confident "
                 "that the problem can be fixed, never desperate.",
 }

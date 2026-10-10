@@ -21,6 +21,9 @@ All names, numbers and businesses are invented. Columns are the PS07 seller-file
   ``ticket_status``, ``ticket_prior_contacts``.
 - catalogue verification: ``listings_to_verify`` (``;`` between listings, ``|`` between
   fields), ``catalogue_size``.
+- live resolution (issue resolution / win-back fixed on the call): ``account_snapshot`` (``;``-separated
+  facts Payal may state), ``live_fixes`` (``;`` between fixes, ``action | what it changes``),
+  ``escalation_offer`` (offered only if the seller is still not satisfied), ``ticket_id``.
 - win-back (had a paid plan and left): ``churned_plan``, ``months_on_plan``,
   ``churned_days_ago``, ``churn_reason`` (free text from the exit note), ``competitor``,
   ``enquiries_on_plan``.
@@ -130,13 +133,37 @@ SELLERS = [
          eng_product_count=120, subscription_plan="Star, 1 year", subscription_expiry_days=30, enquiries_on_plan=310,
          satisfaction="high", renewed_before=1),
     # 7. Issue resolution: frustrated vs confused new seller.
+    # Live resolution: the issue is fixed on the call (live_fixes); an executive only if he is still unhappy.
     dict(fk_glusr_usr_id=9100013, use_case=None, seller_name="Imran Khan", company_name="Royal Furniture House",
          seller_city="Hyderabad", seller_state="Telangana", business_type="Proprietorship",
          annual_turnover="40 L - 1.5 Cr", nature_of_business="Manufacturer", gst_registration_year=2014,
-         top_category_1="Wooden Sofa Sets", top_category_group="Furniture", showed_frustration=1,
+         top_category_1="Wooden Sofa Sets", top_category_group="Furniture", top_category_2="Dining Table Sets",
+         top_category_3="Wooden Beds", eng_product_count=38, eng_enq_received_90d=310, eng_cqs=61,
+         showed_frustration=1, past_objections="Call Handling / Executive Gaps (2)",
          ticket_type="Leads", ticket_summary="getting enquiries for office chairs, which they do not make, and from "
                                              "buyers in other states", ticket_age_days=12, ticket_status="open",
-         ticket_prior_contacts=3),
+         ticket_prior_contacts=3, ticket_id="IM-TKT-58213",
+         subscription_plan="Leader, 1 year", subscription_expiry_days=95, satisfaction="low",
+         account_snapshot="Ticket IM-TKT-58213 raised 12 days ago, he has called about it 3 times; "
+                          "Root cause: in August a listing 'Executive Revolving Chair' was added with a chair photo "
+                          "uploaded by mistake, which mapped his account to the Office Chairs and Office Furniture "
+                          "categories; 47 of his 112 enquiries in the last 30 days were for office chairs; "
+                          "Buyer location in his lead settings is All India, but he delivers only in Telangana, "
+                          "Andhra Pradesh and Karnataka; 38 enquiries in the last 30 days came from other states; "
+                          "Enquiries for what he actually makes (wooden sofa sets, dining tables, beds): 27 in 30 days; "
+                          "He is on the Leader plan, 95 days left, lead quota used 112 of 150 this quarter",
+         live_fixes="Delete the 'Executive Revolving Chair' listing and remove Office Chairs and Office Furniture from "
+                    "his categories | office-chair enquiries stop within 24 hours; "
+                    "Set buyer location to Telangana, Andhra Pradesh and Karnataka only | no more enquiries from "
+                    "states he cannot deliver to; "
+                    "Return the 47 office-chair enquiries to his lead quota (pre-approved on this ticket) | 47 leads "
+                    "added back, quota used goes from 112 to 65 of 150; "
+                    "Make Wooden Sofa Sets, Dining Table Sets and Wooden Beds his priority categories | more "
+                    "enquiries for what he makes; "
+                    "Once he confirms he is satisfied, close ticket IM-TKT-58213 and send him a summary of the changes "
+                    "on WhatsApp | he has every change in writing",
+         escalation_offer="an IndiaMART executive visit to his Hyderabad showroom within 48 hours, or an online "
+                          "meeting, between 11 am and 5 pm, to go through his account in person"),
     dict(fk_glusr_usr_id=9100014, use_case="issue_resolution", seller_name="Pooja Reddy",
          company_name="Sai Pharma Distributors", seller_city="Vijayawada", seller_state="Andhra Pradesh",
          business_type="Proprietorship", annual_turnover="0 - 40 L", nature_of_business="Trader - Wholesaler/Distributor",
@@ -177,11 +204,35 @@ SELLERS = [
          top_category_1="Black Pepper", top_category_group="Spices", churned_plan="Leader, 1 year", months_on_plan=12,
          churned_days_ago=120, enquiries_on_plan=90, competitor="TradeIndia",
          churn_reason="switched to another platform"),
+    # Live resolution: what made him leave is fixed on the call; an executive only if he is still unhappy.
     dict(fk_glusr_usr_id=9100021, use_case="win_back", seller_name="Sanjay Bansal", company_name="Bansal Tiles & Marble",
          seller_city="Kishangarh", seller_state="Rajasthan", business_type="Proprietorship",
          annual_turnover="1.5 - 5 Cr", nature_of_business="Trader - Wholesaler/Distributor",
          gst_registration_year=2009, top_category_1="Marble Slabs", top_category_group="Building Construction Material",
-         churned_plan="Star, 1 year", months_on_plan=36, churned_days_ago=200, enquiries_on_plan=420),
+         top_category_2="Granite Slabs", top_category_3="Vitrified Tiles", eng_product_count=34, eng_cqs=48,
+         churned_plan="Star, 1 year", months_on_plan=36, churned_days_ago=200, enquiries_on_plan=420,
+         churn_reason="most enquiries were irrelevant: retail buyers from far-off states wanting one or two slabs; "
+                      "after he changed his phone the enquiry alerts stopped, so he felt the plan was not working",
+         account_snapshot="On the Star plan for 3 years, it ended 200 days ago, his free listing is still live; "
+                          "Lead settings were never changed from the default: All India, no minimum order; "
+                          "268 of the 420 enquiries on his plan came from outside his delivery area (Rajasthan, "
+                          "Gujarat, Delhi NCR, Haryana, Madhya Pradesh, Punjab); "
+                          "61 percent of his enquiries asked for less than 500 square feet; "
+                          "Enquiry alerts still go to his old mobile number ending 4412, switched off since March; "
+                          "his current registered mobile ends 7730; "
+                          "12 of his 34 listings have no price or photo; "
+                          "Buyers searched for Kishangarh marble in his categories about 3,100 times in the last 30 days",
+         live_fixes="Set lead location to his delivery states: Rajasthan, Gujarat, Delhi NCR, Haryana, Madhya Pradesh "
+                    "and Punjab | only buyers he can deliver to; "
+                    "Set a minimum order of 500 square feet | one-or-two-slab retail enquiries are filtered out; "
+                    "Move enquiry alerts (SMS, WhatsApp and app) to his current mobile ending 7730 | alerts start "
+                    "again from today; "
+                    "Hide the 12 listings without price or photo until he updates them | buyers see only complete "
+                    "listings; "
+                    "Start a 30-day comeback trial with his old Star plan lead access, pre-approved by the account "
+                    "team, nothing to pay now | he sees the filtered enquiries before deciding whether to renew",
+         escalation_offer="a meeting with an IndiaMART executive, a visit in Kishangarh or online, between 11 am and "
+                          "5 pm, to go through his account and plan options"),
     # Asked not to be called: suppressed, no persona.
     dict(fk_glusr_usr_id=9100017, use_case="meeting_scheduling", seller_name="Rakesh Kumar",
          company_name="Kumar Sanitary Store", seller_city="Kanpur", seller_state="Uttar Pradesh",
@@ -196,7 +247,8 @@ USE_CASE_COLS = [
     "registered_days_ago", "digital_experience", "subscription_plan", "subscription_expiry_days", "enquiries_on_plan",
     "satisfaction", "renewed_before", "ticket_type", "ticket_summary", "ticket_age_days", "ticket_status",
     "ticket_prior_contacts", "listings_to_verify", "catalogue_size", "churned_plan", "months_on_plan",
-    "churned_days_ago", "churn_reason", "competitor",
+    "churned_days_ago", "churn_reason", "competitor", "ticket_id", "account_snapshot", "live_fixes",
+    "escalation_offer",
 ]
 PROFILE_COLS = [
     "fk_glusr_usr_id", "seller_city", "seller_state", "business_type", "annual_turnover", "nature_of_business",

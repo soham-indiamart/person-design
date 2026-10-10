@@ -26,6 +26,7 @@ from __future__ import annotations
 import copy
 import math
 import re
+import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -590,7 +591,7 @@ def _winback_context(row: dict) -> list[str]:
         f"Now using: {row['competitor']}." if _str(row.get("competitor")) else None,
     ]
     fixes = winback_fixes(row)
-    if fixes:
+    if fixes and not live_fixes(row):   # with live fixes the problem is solved on the call instead
         lines.append("How their problem can be addressed (suggest in your own words as what the executive will set up "
                      "with them in the meeting; never promise results): " + " ".join(fixes))
     return [line for line in lines if line]
@@ -691,9 +692,129 @@ WINBACK = UseCase(
 )
 
 
+# ---- Live resolution: issue resolution / win-back solved on the call --------------------------------------
+# When the seller file lists ``live_fixes`` (changes Payal is authorised to make on the seller's account during
+# the call), these two use cases resolve the problem end to end instead of routing it to a team or a meeting.
+# Columns: ``account_snapshot`` (``;``-separated facts Payal may state: settings, counts, root cause, ticket id),
+# ``live_fixes`` (``;`` between fixes, ``action | what it changes``), ``escalation_offer`` (only if the seller is
+# still not satisfied after the fixes).
+LIVE_FIX_USE_CASES = ("issue_resolution", "win_back")
+
+
+def live_fixes(row: dict) -> list[tuple[str, str]]:
+    out = []
+    for item in _list(row.get("live_fixes")):
+        action, _, effect = item.partition("|")
+        out.append((action.strip(), effect.strip()))
+    return out
+
+
+def _live_context(row: dict) -> list[str]:
+    snapshot = _list(row.get("account_snapshot"))
+    lines = (["ACCOUNT SNAPSHOT (you may state these to explain the problem): " + "; ".join(snapshot) + "."]
+             if snapshot else [])
+    fixes = live_fixes(row)
+    lines.append("LIVE FIXES (you can make these changes on their account during this call; explain each in one "
+                 "line, get their yes, then say it is done): "
+                 + " ".join(f"fix_{i}: {a}" + (f" (result: {e})." if e else ".") for i, (a, e) in enumerate(fixes, 1)))
+    offer = _str(row.get("escalation_offer"))
+    lines.append("ONLY IF THEY ARE STILL NOT SATISFIED after the fixes, or want something not in LIVE FIXES: "
+                 + (offer or "offer a callback from the right IndiaMART team at a time they choose") + ".")
+    return lines
+
+
+LIVE_STAGES = {
+    "diagnose": ("diagnose", "Explain the cause", "In one simple line, explain why it happened, from the ACCOUNT "
+                 "SNAPSHOT, so they know it is understood. Ask only what is still unclear."),
+    "fix": ("fix", "Fix it now", "Go through the LIVE FIXES that match their problem, most important first, one per "
+            "reply: say what you will change, get their yes, then confirm it is done. Record fix_N=applied or "
+            "fix_N=declined. Never invent a fix that is not listed."),
+    "verify": ("verify", "Check they are satisfied", "Sum up what changed and what they will notice, then ask "
+               "whether this solves it. Record satisfied=yes or satisfied=no with their reason."),
+    "escalate": ("escalate", "Escalate (only if needed)", "Skip this stage if satisfied=yes. Only if they are still "
+                 "not satisfied or want something not in LIVE FIXES: make the escalation offer from the call context "
+                 "and fix its day and time. Record escalation=<what was agreed>."),
+}
+LIVE_NOTE_KEYS = ("issue_confirmed", "fix_1", "fix_2", "fix_3", "fix_4", "fix_5", "satisfied", "escalation",
+                  "meeting_day", "meeting_time", "meeting_mode", "callback")
+LIVE_HANDLERS = (
+    "Can you really change it now: yes, these changes are made on their account during this call; say when they "
+    "will see the effect (from the fix).",
+    "I want something else (refund, a different plan, a price): Payal cannot do that on the call; offer the "
+    "escalation from the call context.",
+    "Why should I believe it will work this time: point to the exact change and what they will notice; never promise "
+    "sales or a number of orders.",
+)
+ISSUE_LIVE_FLOW = _flow(
+    "issue_resolution_live", "Issue resolution (live)",
+    "You are Payal, IndiaMART's voice assistant, following up on an issue a seller reported. You can fix it on this "
+    "call: you have their account details and a list of changes you are authorised to make. Resolve it end to end; "
+    "hand over to an executive only if they are still not satisfied.",
+    [IDENTIFY,
+     ("acknowledge", "Acknowledge", "Refer to their issue from the call context in one line so they never repeat it; "
+      "apologise once. Record issue_confirmed."),
+     LIVE_STAGES["diagnose"], LIVE_STAGES["fix"], LIVE_STAGES["verify"], LIVE_STAGES["escalate"],
+     ("close", "Close", "Give the ticket reference if there is one, say what happens next, thank them, goodbye.")],
+    LIVE_HANDLERS + ("I already explained this many times: apologise, do not ask again; go straight to the fix.",),
+    LIVE_NOTE_KEYS)
+WINBACK_LIVE_FLOW = _flow(
+    "win_back_live", "Win-back (live)",
+    "You are Payal, IndiaMART's voice assistant, calling a seller who had a paid IndiaMART plan and left. You can "
+    "fix what made them leave on this call: you have their account details and a list of changes you are "
+    "authorised to make. Fix it end to end; offer an executive only if they are still not satisfied.",
+    [IDENTIFY,
+     ("reconnect", "Reconnect", "Thank them for having been a paid IndiaMART member, mention the plan in one line."),
+     ("reason", "Why they left", "Confirm the reason from the call context in their words instead of asking cold; let "
+      "them explain fully. Record issue_confirmed."),
+     LIVE_STAGES["diagnose"], LIVE_STAGES["fix"], LIVE_STAGES["verify"], LIVE_STAGES["escalate"],
+     ("close", "Close", "Sum up what is now set up on their account, thank them warmly, goodbye.")],
+    LIVE_HANDLERS + ("I use another platform now: respect it, never criticise competitors; IndiaMART can run "
+                     "alongside.",),
+    LIVE_NOTE_KEYS)
+LIVE_FLOWS = {"issue_resolution": ISSUE_LIVE_FLOW, "win_back": WINBACK_LIVE_FLOW}
+LIVE_PURPOSE = {
+    "issue_resolution": "Payal is following up on the issue the seller reported to IndiaMART, to fix it on this call.",
+    "win_back": "Payal is calling a seller who used to have a paid IndiaMART plan, to understand why they left and "
+                "fix that on this call.",
+}
+LIVE_ASK = "a couple of quick changes on their account to fix it"
+
+
+def _apply_live(out: dict, uc: UseCase, row: dict) -> str:
+    """Fit a spec to live resolution. Returns the call goal."""
+    flow = LIVE_FLOWS[uc.id]
+    goal = ("Resolve the seller's problem on this call, end to end: confirm it, explain the cause from their "
+            "account, make the agreed changes, and check they are satisfied. An executive is offered only if they "
+            "are still not satisfied.")
+    out["call_mode"] = flow.mode
+    u = out["use_case"]
+    u["goal"] = goal
+    u["metric"] = "Issues resolved on the call (seller satisfied), fixes applied, and escalations avoided."
+    u["archetype"]["approach"] += (" Resolve it on this call: use the LIVE FIXES; do not push a meeting or a team "
+                                   "callback unless they are still not satisfied.")
+    u["context"] = [c for c in u["context"]] + _live_context(row)
+    u["checklist"] = ([{"key": "issue_confirmed", "label": "problem confirmed"}]
+                      + [{"key": f"fix_{i}", "label": textwrap.shorten(a, 60, placeholder="...")} for i, (a, _) in enumerate(live_fixes(row), 1)]
+                      + [{"key": "satisfied", "label": "seller satisfied"}])
+    extras = {k: v for k, v in uc.facts.items()
+              if k in ("ticket_rule", "plan_rule", "apology_rule", "meeting_modes", "meeting_hours")}
+    out["facts"] = _facts(
+        LIVE_PURPOSE[uc.id],
+        "Payal can make the changes listed under LIVE FIXES on the seller's account during this call, after the "
+        "seller agrees to each, and confirm they are done. An executive meeting or team callback is offered only if "
+        "the seller is still not satisfied, or asks for something not in LIVE FIXES.",
+        {**extras,
+         "fix_rule": "Only the changes in LIVE FIXES can be made on this call; never invent another change, credit, "
+                     "refund, price or date.",
+         "snapshot_rule": "Payal may state anything in the ACCOUNT SNAPSHOT (settings, counts, dates, reference "
+                          "numbers) to explain the problem."})
+    return goal
+
+
 USE_CASES: dict[str, UseCase] = {u.id: u for u in (ENRICHMENT, MEETING, QUALIFY, RECOVER, ONBOARD, RENEW, ISSUE,
                                                    CATALOGUE, WINBACK)}
 USE_CASE_FLOWS: dict[str, Flow] = {u.flow.mode: u.flow for u in USE_CASES.values()}
+USE_CASE_FLOWS.update({f.mode: f for f in LIVE_FLOWS.values()})
 ALIASES = {"seller": "meeting_scheduling", "meeting": "meeting_scheduling", "enrichment": "seller_enrichment",
            "qualification": "lead_qualification", "recovery": "response_recovery", "catalogue": "catalogue_verification",
            "issue": "issue_resolution", "renewal_upgrade": "renewal", "winback": "win_back", "churn": "win_back",
@@ -787,20 +908,29 @@ def apply_use_case(spec: dict, row: dict | None, use_case: str | None = None) ->
         return out
 
     out["facts"] = uc.facts
+    goal = uc.goal
+    live = uc.id in LIVE_FIX_USE_CASES and bool(live_fixes(row))
+    ask = uc.ask
+    if live:
+        goal, ask = _apply_live(out, uc, row), LIVE_ASK
     plan = out["conversation_plan"]
     plan["opening"] = {
         **plan["opening"],
         "steps": [s for s in plan["opening"]["steps"] if "meeting" not in s.lower() and "callback last time" not in s]
-        + [f"Give the reason for the call in one line: {uc.goal}"],
+        + [f"Give the reason for the call in one line: {goal}"],
     }
     plan["personalisation"] = [h for h in plan["personalisation"] if "visit" not in h["value"].lower()]
     for p in plan["objection_playbook"]:
-        p["approach"] = GENERIC_PLAYBOOK.get(p["objection"], p["approach"]).format(ask=uc.ask, benefit=uc.benefit)
+        p["approach"] = GENERIC_PLAYBOOK.get(p["objection"], p["approach"]).format(ask=ask, benefit=uc.benefit)
     plan["escalation_rules"] = [
-        {**e, "when": e["when"].replace("refuses the meeting", f"refuses {uc.ask}"),
+        {**e, "when": e["when"].replace("refuses the meeting", f"refuses {ask}"),
          "do": e["do"].replace("the executive will cover it in the meeting", "the IndiaMART team confirms prices")
                       .replace("Offer an executive callback within 11 am - 5 pm",
                                "Offer a callback from the right IndiaMART team")}
         for e in plan["escalation_rules"]
     ]
+    if live:
+        plan["escalation_rules"].insert(0, {
+            "when": "the seller is still not satisfied after the live fixes, or wants something not in LIVE FIXES",
+            "do": _str(row.get("escalation_offer")) or "Offer a callback from the right IndiaMART team."})
     return out

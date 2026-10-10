@@ -434,7 +434,7 @@ def test_cooked_seller_file_maps_every_use_case_and_archetype():
         "Tiwari Agro Machinery": ("win_back", "burned", "empathetic_listener"),
         "Saxena Office Supplies": ("win_back", "price", "advisor"),
         "Malabar Spices Export": ("win_back", "competitor", "gentle_nudger"),
-        "Bansal Tiles & Marble": ("win_back", "drifted", "closer"),
+        "Bansal Tiles & Marble": ("win_back", "burned", "empathetic_listener"),
     }
     for company, (uid, arch, persona) in expect.items():
         uc = specs[company]["use_case"]
@@ -662,3 +662,25 @@ def test_credit_cap_blocks_before_sending(tmp_path):
     with pytest.raises(CreditLimitReached):
         b.check("text_to_speech", tts_cost("x" * 100))  # 0.3 more would pass the cap
     b.check("speech_to_text", stt_cost(b"\x00" * 16000))  # ~1 s of audio is cheap: allowed
+
+
+def test_live_fixes_resolve_on_the_call_and_executive_only_as_escalation():
+    from vani_persona.ps04.live import CallSession
+    from vani_persona.ps04.seller_file import SAMPLE, build_spec, parse
+
+    specs = {r["company_name"]: build_spec(r, EVIDENCE) for r in parse(SAMPLE.read_bytes(), SAMPLE.name)}
+    for company, mode in (("Royal Furniture House", "issue_resolution_live"), ("Bansal Tiles & Marble", "win_back_live")):
+        spec = specs[company]
+        uc = spec["use_case"]
+        assert spec["call_mode"] == mode, company
+        keys = [c["key"] for c in uc["checklist"]]
+        assert keys[0] == "issue_confirmed" and keys[-1] == "satisfied" and "fix_1" in keys, company
+        assert not any(k.startswith("meeting") for k in keys), company          # no meeting on the checklist
+        assert "still not satisfied" in spec["conversation_plan"]["escalation_rules"][0]["when"], company
+        session = CallSession(spec, use_llm_signals=False)
+        assert [st.id for st in session.flow.stages][3:6] == ["fix", "verify", "escalate"] or             "fix" in [st.id for st in session.flow.stages], company
+        prompt = session.system_prompt()
+        assert "LIVE FIXES" in prompt and "ACCOUNT SNAPSHOT" in prompt, company
+    # Without live_fixes the use cases keep their routing / meeting flow.
+    assert specs["Tiwari Agro Machinery"]["call_mode"] == "win_back"
+    assert any(c["key"] == "meeting_day" for c in specs["Tiwari Agro Machinery"]["use_case"]["checklist"])

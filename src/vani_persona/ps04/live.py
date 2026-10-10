@@ -43,7 +43,8 @@ from vani_persona.ps04.profile import LiveProfile, apply_profile, profile_from_s
 from vani_persona.ps04.signals import (END_PATTERN, Detection, LanguageTracker, looks_incomplete, pace_request,
                                        wants_to_end)
 
-MEETING_MODES = ("seller", "win_back")   # flows that end in a booked meeting (##MEETING## tag)
+MEETING_MODES = ("seller", "win_back", "win_back_live", "issue_resolution_live")   # flows that can end in a booked meeting (##MEETING## tag); live-fix flows only on escalation
+LIVE_FIX_MODES = ("issue_resolution_live", "win_back_live")
 
 MAX_WAITS = 2      # consecutive "sounds unfinished, keep listening" holds before replying anyway
 MAX_NUDGES = 2     # "are you still there?" check-ins before closing the call
@@ -548,6 +549,12 @@ Only on your final goodbye (goal reached, {who} refused per the rules, or asked 
                 and notes.get("meeting_day") and notes.get("meeting_time")):
             mode = f", {notes['meeting_mode']}" if notes.get("meeting_mode") else ""
             self.outcome["meeting"] = f"{notes['meeting_day']} {notes['meeting_time']}{mode}"
+        if self.flow.mode in LIVE_FIX_MODES:
+            applied = [k for k, v in notes.items() if k.startswith("fix_") and "declin" not in v.lower()]
+            if applied:
+                self.outcome["fixes_applied"] = ", ".join(sorted(applied))
+            if notes.get("satisfied"):
+                self.outcome["resolved_on_call"] = notes["satisfied"]
         if end:
             self.ended = True
         return text, {"llm_ms": ms, "end": end, "stage": self.flow_state["stage"]}
