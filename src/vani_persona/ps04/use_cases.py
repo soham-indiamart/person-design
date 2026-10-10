@@ -3,7 +3,8 @@
 A seller-file row says *who* the seller is (the generator turns that into voice, language,
 tone and plan) and, through its use-case columns, *what this call needs from them*:
 missing profile fields, an enquiry to qualify, unanswered enquiries, onboarding steps,
-a subscription about to expire, an open complaint, or listings to verify.
+a subscription about to expire, an open complaint, listings to verify, or a paid plan
+they left (win-back).
 
 For every seller this module
 
@@ -556,12 +557,114 @@ CATALOGUE = UseCase(
 )
 
 
+# ---- 9. Win back a churned seller --------------------------------------------------------------------------
+BURNED_WORDS = ("irrelevant", "fake", "poor", "bad", "service", "quality", "complaint", "wrong", "no response",
+                "spam", "fraud")
+COMPETITOR_WORDS = ("competitor", "other platform", "another platform", "tradeindia", "justdial", "own website",
+                    "switched")
+PRICE_WORDS = ("price", "cost", "expensive", "costly", "budget", "afford", "slow", "business down", "roi", "not worth")
+
+
+def _choose_winback(t: dict, row: dict, stype: str) -> tuple[str, str]:
+    why = (_str(row.get("churn_reason")) or "").lower()
+    if any(w in why for w in BURNED_WORDS) or t["frustration"] or "bad_past_experience" in t["objections"]:
+        return "burned", f"Left after a bad experience ({why or 'frustration on record'}): has to be heard first"
+    if _str(row.get("competitor")) or any(w in why for w in COMPETITOR_WORDS):
+        return "competitor", f"Moved to {_str(row.get('competitor')) or 'another platform'}: respect the choice, stay curious"
+    if any(w in why for w in PRICE_WORDS):
+        return "price", f"Left over cost / value ({why}): needs the numbers, not a pitch"
+    enq = _num(row.get("enquiries_on_plan")) or 0
+    return "drifted", (f"No clear reason recorded and {int(enq)} enquiries on the plan: drifted away, warm reminder"
+                       if enq else "No clear reason recorded: drifted away, warm reminder")
+
+
+def _winback_context(row: dict) -> list[str]:
+    plan = _str(row.get("churned_plan"))
+    months, days = _num(row.get("months_on_plan")), _num(row.get("churned_days_ago"))
+    lines = [
+        (f"Was on the {plan} plan" + (f" for {int(months)} months" if months else "")
+         + (f"; it ended {int(days)} days ago" if days is not None else "") + ".") if plan else None,
+        f"Reason recorded when they left: {row['churn_reason']}." if _str(row.get("churn_reason")) else None,
+        (f"Buyer enquiries while on the plan: {int(_num(row['enquiries_on_plan']))}."
+         if _num(row.get("enquiries_on_plan")) is not None else None),
+        f"Now using: {row['competitor']}." if _str(row.get("competitor")) else None,
+    ]
+    return [line for line in lines if line]
+
+
+WINBACK = UseCase(
+    id="win_back", name="Win back a churned seller",
+    goal="Reconnect with a seller who left their paid IndiaMART plan, understand honestly why they left, and find "
+         "out what would bring them back.",
+    metric="Churn reasons captured, sellers open to an account-manager callback, and win-back conversion.",
+    ask="a few minutes to hear why they left", benefit="buyers are still searching IndiaMART for what they sell",
+    facts=_facts("Payal is calling a seller who used to have a paid IndiaMART plan, to understand why they left and "
+                 "whether anything would make it worth coming back.",
+                 "If they are open to it, an IndiaMART account manager calls them with suitable plan options; their "
+                 "free listing stays active either way.",
+                 {"plan_rule": "Payal may mention the old plan name and their enquiry numbers from the call context, "
+                               "never prices, discounts or offers.",
+                  "tone_rule": "This is not a sales call: listening and the honest reason matter more than a yes.",
+                  "apology_rule": "Apologise at most once in the whole call, and only after the seller has described "
+                                  "the problem; if you already apologised (see the history), acknowledge without "
+                                  "saying sorry again."}),
+    flow=_flow("win_back", "Win-back",
+               "You are Payal, IndiaMART's voice assistant, calling a seller who had a paid IndiaMART plan and left. "
+               "Thank them for having been with IndiaMART, understand honestly why they left, and find out what would "
+               "bring them back. Never sound desperate and never pressure.",
+               [IDENTIFY,
+                ("reconnect", "Reconnect", "Thank them for having been a paid IndiaMART member and mention the plan "
+                 "from the call context in one line. No pitch and no apology yet."),
+                ("reason", "Why they left", "If a reason is in the call context, confirm it in their words ('aapne "
+                 "bataya tha leads relevant nahi the, sahi?') instead of asking cold; otherwise ask openly."),
+                ("what_changed", "What would change it", "Ask what would have to be different for IndiaMART to be "
+                 "worth it again. Relate it to their own numbers; note complaints for the account manager."),
+                ("comeback", "Open to coming back", "Ask if they would take a call from an account manager with "
+                 "options that fit; if no, accept it and say the free listing stays active. Always record their "
+                 "answer as comeback_interest (yes / maybe / no), and the agreed time as followup_time."),
+                CLOSE],
+               ("Why should I come back / what is new: do not oversell; ask what they need and say the account manager "
+                "can show what fits.",
+                "Price was too high: acknowledge; the account manager can discuss plan options; Payal does not quote.",
+                "Leads were fake or irrelevant: acknowledge, ask which kind, note it; lead preferences can be set by "
+                "product and city.",
+                "I use another platform now: respect it, never criticise competitors; ask what works better there."),
+               ("churn_reason", "what_would_change", "comeback_interest", "followup_time", "competitor", "callback")),
+    archetypes={
+        "burned": Archetype("burned", "Left after a bad experience", "empathetic_listener",
+                            "Hear them out first: let them describe what went wrong, acknowledge it in their own words, "
+                            "apologise only once in the whole call, note it for the account manager. Only then ask "
+                            "what would need to change.",
+                            {"empathy": "high", "warmth": "calm"}),
+        "price": Archetype("price", "Left over cost / value", "advisor",
+                           "Consultative: talk about value with their own numbers (enquiries on the plan), ask what "
+                           "return they need, and offer an account-manager call about options that fit their budget.",
+                           {"vocabulary": "business"}),
+        "competitor": Archetype("competitor", "Moved to another platform", "gentle_nudger",
+                                "Respectful curiosity: never criticise the other platform; ask what works better there "
+                                "and what IndiaMART could do differently; keep the door open, no pressure.",
+                                {"sentence_length": "short"}),
+        "drifted": Archetype("drifted", "Drifted away", "closer",
+                             "Warm reconnect: remind them of the buyers they got on IndiaMART, ask why they stopped, "
+                             "and invite them back with an account-manager call.", {"warmth": "high"}),
+    },
+    choose=_choose_winback,
+    context=_winback_context,
+    checklist=lambda row: [("churn_reason", "why they left"), ("what_would_change", "what would bring them back"),
+                           ("comeback_interest", "open to coming back"),
+                           ("followup_time", "account-manager callback time")],
+)
+
+
 USE_CASES: dict[str, UseCase] = {u.id: u for u in (ENRICHMENT, MEETING, QUALIFY, RECOVER, ONBOARD, RENEW, ISSUE,
-                                                   CATALOGUE)}
+                                                   CATALOGUE, WINBACK)}
 USE_CASE_FLOWS: dict[str, Flow] = {u.flow.mode: u.flow for u in USE_CASES.values()}
+# A note that settles another checklist item: (mode -> {note: (implied note, value)}).
+NOTE_IMPLIES = {"win_back": {"followup_time": ("comeback_interest", "yes, agreed to an account-manager call")}}
 ALIASES = {"seller": "meeting_scheduling", "meeting": "meeting_scheduling", "enrichment": "seller_enrichment",
            "qualification": "lead_qualification", "recovery": "response_recovery", "catalogue": "catalogue_verification",
-           "issue": "issue_resolution", "renewal_upgrade": "renewal"}
+           "issue": "issue_resolution", "renewal_upgrade": "renewal", "winback": "win_back", "churn": "win_back",
+           "churned": "win_back", "win_back_seller": "win_back", "reactivation": "win_back"}
 
 
 def resolve(name: str | None) -> str | None:
@@ -580,6 +683,8 @@ def infer_use_case(row: dict) -> tuple[str, str]:
     rules = [
         (_str(row.get("ticket_summary")) and (_str(row.get("ticket_status")) or "open").lower() != "closed",
          "issue_resolution", "Open issue on record: follow up on it first."),
+        (_str(row.get("churned_plan")) or _num(row.get("churned_days_ago")) is not None, "win_back",
+         "Had a paid plan and left: win-back call."),
         (expiry is not None and expiry <= 60, "renewal", f"Subscription expires in {int(expiry or 0)} days."),
         ((_num(row.get("unreplied_enquiries")) or 0) > 0, "response_recovery",
          f"{int(_num(row.get('unreplied_enquiries')) or 0)} buyer enquiries without a reply."),

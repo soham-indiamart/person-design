@@ -5,162 +5,312 @@
 <title>VANI · Seller-fit adaptive persona (Sarvam)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --mute:#667085; --line:#e4e7ec; --acc:#2f6fed; --hot:#e8590c; --ok:#12866b; }
+  :root {
+    --bg:#08110e; --bg2:#0c1814; --card:#0f1d18; --card2:#13241e; --ink:#e8f3ee; --mute:#8ba79b; --line:#1d3a30; --line2:#2a5a49;
+    --acc:#34d399; --acc-ink:#04140d; --acc-soft:#34d39922; --hot:#fbbf24; --ok:#34d399; --bad:#f87171;
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; background:var(--bg); color:var(--ink); }
-  header { padding:12px 20px; background:#101828; color:#fff; display:flex; align-items:center; gap:16px; }
-  header h1 { font-size:17px; margin:0; font-weight:600; }
-  header .sub { color:#98a2b3; font-size:12px; }
-  main { display:grid; grid-template-columns: 300px 1fr 400px; gap:14px; padding:14px; height: calc(100vh - 54px); }
-  .col { display:flex; flex-direction:column; gap:12px; min-height:0; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  html { color-scheme: dark; }
+  body { margin:0; font:14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; background:var(--bg); color:var(--ink); }
+  ::-webkit-scrollbar { width:8px; height:8px; } ::-webkit-scrollbar-thumb { background:#1f3d33; border-radius:8px; }
+
+  /* ---- header ---- */
+  header { padding:10px 20px; background:var(--bg2); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  header .logo { width:30px; height:30px; border-radius:8px; background:var(--acc); color:var(--acc-ink); display:grid; place-items:center; font-weight:800; font-family:var(--mono); }
+  header h1 { font-size:17px; margin:0; font-weight:700; letter-spacing:-.01em; }
+  header h1 em { color:var(--acc); font-style:normal; }
+  .steps { display:flex; gap:6px; align-items:center; font:600 11px var(--mono); text-transform:uppercase; letter-spacing:.08em; color:var(--mute); }
+  .steps .st { border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
+  .steps .st.on { border-color:var(--acc); color:var(--acc); background:var(--acc-soft); }
+  .steps .st.done { color:var(--ink); }
+  .steps .sep { color:var(--line2); }
+  #credits { margin-left:auto; font-family:var(--mono); font-size:11.5px; color:var(--mute); border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
+
+  /* ---- layout ---- */
+  main { display:grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr) minmax(330px, 420px); gap:14px; padding:14px; height: calc(100vh - 53px); }
+  .col { display:flex; flex-direction:column; gap:12px; min-height:0; min-width:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; min-width:0; }
+  .card.hero { border-color:var(--line2); background:linear-gradient(180deg, #11241d, var(--card)); }
+  .card.grow { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .card-h { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  h2 { font:600 11.5px/1.3 var(--mono); text-transform:uppercase; letter-spacing:.14em; color:var(--acc); margin:0; }
+  .sublabel { font:600 10.5px var(--mono); text-transform:uppercase; letter-spacing:.12em; color:var(--mute); margin:12px 0 5px; }
   .scroll { overflow:auto; min-height:0; }
-  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--mute); margin:0 0 8px; }
-  .seller { cursor:pointer; border:1px solid var(--line); border-radius:8px; padding:9px; margin-bottom:8px; }
-  .seller:hover { border-color:var(--acc); }
-  .seller.sel { border-color:var(--acc); box-shadow:0 0 0 2px #2f6fed33; }
-  .seller b { text-transform:capitalize; }
+
+  /* ---- tabs ---- */
+  .tabs { display:flex; gap:2px; border-bottom:1px solid var(--line); margin:0 -14px 10px; padding:0 8px; overflow-x:auto; flex:none; }
+  .tabs button { background:none; color:var(--mute); border-radius:0; padding:8px 10px; border-bottom:2px solid transparent; font:600 11px var(--mono); text-transform:uppercase; letter-spacing:.1em; white-space:nowrap; }
+  .tabs button:hover { color:var(--ink); filter:none; }
+  .tabs button.on { color:var(--acc); border-bottom-color:var(--acc); }
+  .tabs .n { display:inline-block; min-width:18px; margin-left:4px; padding:0 5px; border-radius:999px; background:#16302a; color:var(--ink); font-size:10px; letter-spacing:0; }
+  .pane { display:none; }
+  .pane.on { display:flex; flex-direction:column; flex:1; min-height:0; }
+  .pane-body { overflow:auto; flex:1; min-height:0; padding-right:2px; }
+
+  /* ---- sellers ---- */
+  .upload { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px; border:1px dashed var(--line2); border-radius:10px; background:var(--acc-soft); }
+  .upload .reason { flex-basis:100%; }
+  .search { margin:10px 0 8px; }
+  .search input { width:100%; }
+  .seller { cursor:pointer; border:1px solid var(--line); background:var(--card2); border-radius:10px; padding:9px 11px; margin-bottom:8px; transition:border-color .15s, transform .15s; }
+  .seller:hover { border-color:#2f7d62; transform:translateY(-1px); }
+  .seller.sel { border-color:var(--acc); box-shadow:0 0 0 2px var(--acc-soft); }
+  .seller.off { opacity:.55; cursor:default; transform:none; }
+  .seller .top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .seller .nm { font-weight:700; text-transform:capitalize; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .seller .top .tag { flex:none; }
+  .seller .tagrow { display:flex; flex-wrap:wrap; gap:4px; margin:3px 0 4px; }
+  .seller .starts { font-size:11.5px; color:var(--mute); margin-top:3px; }
+  .seller .starts b { color:var(--ink); }
+  .seller .more { display:none; margin-top:7px; padding-top:7px; border-top:1px dashed var(--line); }
+  .seller.sel .more { display:block; }
+  .seller.sel .clamp { -webkit-line-clamp:unset; }
+  .clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .clamp1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .empty-list { color:var(--mute); font-size:12.5px; text-align:center; padding:18px 8px; }
   .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-  .chip { font-size:11px; background:#eef2ff; color:#3538cd; border-radius:10px; padding:1px 7px; }
-  .chip.changed { background:#fff1e6; color:var(--hot); font-weight:600; }
-  #chat { flex:1; }
-  .msg { max-width:80%; padding:8px 11px; border-radius:12px; margin:6px 0; white-space:pre-wrap; }
-  .bot { background:#eef4ff; margin-right:auto; border-bottom-left-radius:3px; }
-  .you { background:#ecfdf3; margin-left:auto; border-bottom-right-radius:3px; }
+  .chip { font-size:11px; background:#16302a; color:#a7f3d0; border:1px solid #1f4a3c; border-radius:999px; padding:1px 8px; }
+  .chip.changed { background:#3a2a07; color:var(--hot); border-color:#5c430c; font-weight:600; }
+  .chip.done { background:#0f3b2b; color:var(--acc); border-color:#2a6b52; }
+
+  /* ---- call ---- */
+  .who { display:flex; gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card2); margin-bottom:12px; min-width:0; }
+  .who .av { flex:none; width:36px; height:36px; border-radius:50%; display:grid; place-items:center; background:var(--acc-soft); color:var(--acc); border:1px solid var(--line2); font:700 15px var(--mono); }
+  .who b { text-transform:capitalize; }
+  .setup { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:8px 10px; }
+  .field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .field > span { font:600 10.5px var(--mono); text-transform:uppercase; letter-spacing:.1em; color:var(--mute); }
+  .field select, .field input { width:100%; }
+  .actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--bg2); }
+  .actions .live { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .toggles { display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; }
+  #chat { flex:1; min-height:220px; overflow:auto; padding:10px 4px; margin-top:10px; border-top:1px solid var(--line); }
+  .empty { height:100%; min-height:180px; display:grid; place-items:center; text-align:center; color:var(--mute); font-size:13px; }
+  .empty b { color:var(--ink); display:block; margin-bottom:4px; }
+  .msg { max-width:80%; padding:9px 12px; border-radius:14px; margin:7px 0; white-space:pre-wrap; border:1px solid transparent; overflow-wrap:anywhere; }
+  .bot { background:#132a23; border-color:#1f4337; margin-right:auto; border-bottom-left-radius:4px; }
+  .you { background:#1b2f45; border-color:#27425f; margin-left:auto; border-bottom-right-radius:4px; }
   .msg .meta { font-size:11px; color:var(--mute); margin-top:3px; }
-  .sw { margin:6px auto; font-size:12px; background:#fff7ed; border:1px dashed #fdba74; border-radius:8px; padding:5px 9px; max-width:90%; }
+  .msg.pending { opacity:.65; border:1px dashed var(--acc); }
+  .sw { margin:7px auto; font-size:12px; background:#2a2108; border:1px dashed #6b5312; border-radius:10px; padding:6px 10px; max-width:92%; }
+  .composer { display:flex; gap:8px; padding-top:10px; border-top:1px solid var(--line); }
+
+  /* ---- controls ---- */
   .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  button { border:0; border-radius:8px; padding:8px 13px; font-weight:600; cursor:pointer; background:var(--acc); color:#fff; }
-  button.sec { background:#eaecf0; color:var(--ink); }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  #status { font-weight:600; }
-  #status.listening { color:var(--ok); } #status.thinking { color:#b54708; } #status.speaking { color:var(--acc); }
-  .meter { width:120px; height:8px; background:#eaecf0; border-radius:4px; overflow:hidden; }
+  button { border:0; border-radius:8px; padding:8px 14px; font-weight:700; cursor:pointer; background:var(--acc); color:var(--acc-ink); transition:filter .15s; font-family:inherit; }
+  button:hover:not(:disabled) { filter:brightness(1.1); }
+  button.sec { background:transparent; color:var(--ink); border:1px solid var(--line2); }
+  button.sec:hover:not(:disabled) { background:var(--acc-soft); }
+  button.sm { padding:3px 9px; font-size:11px; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  #status { font:600 12px var(--mono); padding:3px 9px; border-radius:999px; border:1px solid var(--line); white-space:nowrap; }
+  #status.listening { color:var(--ok); border-color:#2a6b52; } #status.thinking { color:var(--hot); border-color:#5c430c; } #status.speaking { color:#93c5fd; border-color:#27425f; }
+  .meter { width:90px; height:8px; background:#16302a; border-radius:4px; overflow:hidden; }
   .meter > div { height:100%; width:0; background:var(--ok); transition:width .08s; }
-  input[type=text] { flex:1; padding:8px; border:1px solid var(--line); border-radius:8px; min-width:120px; }
+  input[type=text], select { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg2); color:var(--ink); font:inherit; min-width:0; max-width:100%; }
+  input[type=text] { flex:1; }
+  input[type=text]:focus, select:focus { outline:none; border-color:var(--acc); }
+  input[type=text]:disabled { opacity:.5; cursor:not-allowed; }
+  input[type=file] { color:var(--mute); font-size:12px; max-width:100%; }
+  input[type=file]::file-selector-button { background:var(--acc); color:var(--acc-ink); border:0; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer; margin-right:8px; }
+  input[type=checkbox] { accent-color:var(--acc); }
+  label { color:var(--mute); font-size:12.5px; }
+
+  /* ---- insights ---- */
   table { width:100%; border-collapse:collapse; font-size:12px; }
-  td, th { border-bottom:1px solid var(--line); padding:5px 4px; text-align:left; vertical-align:top; }
-  th { color:var(--mute); font-weight:600; }
-  .kv { display:grid; grid-template-columns: 110px 1fr; gap:3px 8px; font-size:12.5px; }
+  td, th { border-bottom:1px solid var(--line); padding:6px 4px; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+  th { color:var(--mute); font-weight:600; font-family:var(--mono); font-size:11px; }
+  .kv { display:grid; grid-template-columns: 120px 1fr; gap:4px 8px; font-size:12.5px; }
   .kv .k { color:var(--mute); }
   .kv .v.changed { color:var(--hot); font-weight:700; }
   details summary { cursor:pointer; color:var(--acc); font-weight:600; }
-  pre { font-size:11px; white-space:pre-wrap; max-height:340px; overflow:auto; background:#f9fafb; padding:8px; border-radius:6px; }
-  .reason { color:var(--mute); font-size:11.5px; }
-  .tag { display:inline-block; font-size:10.5px; padding:0 5px; border-radius:4px; background:#f2f4f7; color:#344054; }
-  .badge { border-radius:10px; padding:10px 12px; color:#fff; background:#2f6fed; transition:background .3s; }
-  .badge .nm { font-size:20px; font-weight:700; }
+  details.fold > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; font:600 11.5px var(--mono); text-transform:uppercase; letter-spacing:.14em; }
+  details.fold > summary::-webkit-details-marker { display:none; }
+  details.fold > summary::after { content:"＋"; color:var(--mute); }
+  details.fold[open] > summary::after { content:"－"; }
+  details.fold[open] > summary { margin-bottom:10px; }
+  details.fold[open] { max-height:45vh; overflow:auto; }
+  pre { font-size:11px; white-space:pre-wrap; max-height:340px; overflow:auto; background:var(--bg2); padding:8px; border-radius:6px; }
+  .reason { color:var(--mute); font-size:11.5px; overflow-wrap:anywhere; }
+  .tag { display:inline-block; font-size:10.5px; padding:0 6px; border-radius:4px; background:#1a2c27; color:#c5d9d0; border:1px solid var(--line); }
+  .tag.moderate { background:#0f3b2b; color:var(--acc); border-color:#2a6b52; }
+  .tag.weak { background:#3a2a07; color:var(--hot); border-color:#5c430c; }
+  .tag.informed_guess, .tag.inconclusive { background:#1a2c27; color:var(--mute); }
+  .pill { display:inline-block; color:#fff; border-radius:999px; padding:0 8px; font-weight:600; }
+  .badge { border-radius:12px; padding:12px 14px; color:#fff; background:var(--card2); border:1px solid var(--line); transition:background .3s; }
+  .badge .nm { font-size:20px; font-weight:800; }
   .badge .ds { font-size:12px; opacity:.92; }
   .badge.flash { animation: flash 1s ease 2; }
-  @keyframes flash { 50% { transform: scale(1.03); box-shadow:0 0 0 4px #fdba7466; } }
-  .tl { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; align-items:center; font-size:11.5px; }
-  .tl span.p { color:#fff; border-radius:10px; padding:1px 8px; }
-  .bar { height:7px; background:#eaecf0; border-radius:4px; overflow:hidden; margin:3px 0 6px; }
-  .bar > div { height:100%; background:#e8590c; }
-  .pcat { display:grid; grid-template-columns: 12px 1fr; gap:4px 8px; font-size:12px; align-items:start; }
+  @keyframes flash { 50% { transform: scale(1.03); box-shadow:0 0 0 4px #34d39966; } }
+  .tl { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; align-items:center; font-size:11.5px; color:var(--mute); }
+  .tl span.p { color:#fff; border-radius:999px; padding:1px 8px; }
+  .bar { height:7px; background:#16302a; border-radius:4px; overflow:hidden; margin:3px 0 6px; }
+  .bar > div { height:100%; background:var(--acc); }
+  .pcat { display:grid; grid-template-columns: 12px 1fr; gap:5px 8px; font-size:12px; align-items:start; }
   .pcat i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-top:4px; }
   .plabel { font-size:15px; font-weight:700; color:var(--ink); }
-  select { padding:6px; border:1px solid var(--line); border-radius:8px; font:inherit; }
-  .stages { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11.5px; }
-  .stage { border:1px solid var(--line); border-radius:10px; padding:1px 8px; color:var(--mute); }
-  .stage.done { background:#ecfdf3; color:#067647; border-color:#abefc6; }
-  .stage.now { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:600; }
-  .msg.pending { opacity:.6; border:1px dashed #12866b; }
-  .tag.moderate { background:#ecfdf3; color:#067647; } .tag.weak { background:#fffaeb; color:#b54708; } .tag.informed_guess, .tag.inconclusive { background:#f2f4f7; color:#475467; }
+  .stages { display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:11.5px; color:var(--mute); }
+  .stage { border:1px solid var(--line); border-radius:999px; padding:1px 9px; color:var(--mute); }
+  .stage.done { background:#0f3b2b; color:var(--acc); border-color:#2a6b52; }
+  .stage.now { background:var(--acc); color:var(--acc-ink); border-color:var(--acc); font-weight:700; }
+  #spec p, #spec ul, #spec ol { font-size:12.5px; }
+
+  /* Laptop: narrower side columns */
+  @media (max-width: 1380px) {
+    main { grid-template-columns: minmax(280px, 330px) minmax(0, 1fr) minmax(300px, 370px); gap:12px; padding:12px; }
+    .steps { display:none; }
+  }
+  /* Tablet: sellers + call side by side, insights below; the page scrolls */
+  @media (max-width: 1100px) {
+    main { grid-template-columns: minmax(270px, 330px) minmax(0, 1fr); height:auto; }
+    .col { min-height:auto; }
+    main > section:nth-child(3) { grid-column: 1 / -1; display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items:start; }
+    #sellersCard { flex:none; height:75vh; }
+    #callCard { flex:none; height:75vh; }
+    #insights { height:60vh; }
+  }
+  /* Phone: one column */
+  @media (max-width: 760px) {
+    header { padding:10px 14px; gap:10px; }
+    #credits { margin-left:0; max-width:100%; white-space:normal; }
+    main { grid-template-columns: minmax(0, 1fr); padding:10px; gap:10px; }
+    main > section:nth-child(3) { grid-template-columns: minmax(0, 1fr); }
+    #sellersCard { height:65vh; }
+    #callCard { height:auto; min-height:80vh; }
+    .actions .live { margin-left:0; }
+    .msg { max-width:92%; }
+    .meter { width:70px; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>VANI · Seller-fit adaptive persona</h1>
-  <span class="sub">Saaras speech-to-text → turn-taking gate → Behaviour Analyst + live caller profile → Persona Director → call flow → Sarvam LLM → Bulbul voice (streamed)</span>
-  <span class="sub" id="credits" style="margin-left:auto"></span>
+  <div class="logo">V</div>
+  <h1>VANI <em>Persona</em></h1>
+  <div class="steps" id="steps">
+    <span class="st on">1 · Pick a seller</span><span class="sep">›</span>
+    <span class="st">2 · Run the call</span><span class="sep">›</span>
+    <span class="st">3 · Watch it adapt</span>
+  </div>
+  <span id="credits">Sarvam credits: —</span>
 </header>
 <main>
+  <!-- 1 · sellers -->
   <section class="col">
-    <div class="card scroll" style="flex:1.4">
-      <h2>1 · Seller data file</h2>
-      <div class="controls">
-        <input type="file" id="sellerFile" accept=".csv,.json,.xlsx" onchange="uploadFile(this.files[0])" style="max-width:190px">
-        <button class="sec" onclick="loadSample()">Load sample</button>
+    <div class="card hero grow" id="sellersCard">
+      <div class="card-h"><h2>1 · Choose a seller</h2></div>
+      <div class="tabs" data-g="sellers">
+        <button data-t="file" class="on" onclick="tab('sellers','file')">Seller file <span class="n" id="nFile">0</span></button>
+        <button data-t="demo" onclick="tab('sellers','demo')">PS07 samples <span class="n" id="nDemo">0</span></button>
       </div>
-      <div class="reason" id="fileName" style="margin:4px 0 6px"></div>
-      <div id="fileSellers"></div>
-    </div>
-    <div class="card scroll" style="flex:1">
-      <h2>or a PS07 sample seller</h2>
-      <div id="sellers"></div>
-      <div class="controls" style="margin-top:6px">
-        <input type="text" id="sellerId" placeholder="or any seller id from the file">
-        <button class="sec" onclick="pickCustom()">Load</button>
+      <div class="pane on" data-g="sellers" data-t="file">
+        <div class="upload">
+          <input type="file" id="sellerFile" accept=".csv,.json,.xlsx" onchange="uploadFile(this.files[0])">
+          <button class="sec" onclick="loadSample()">Load sample</button>
+          <div class="reason" id="fileName">CSV, JSON or XLSX · one row per seller</div>
+        </div>
+        <div class="search"><input type="text" id="qFile" placeholder="Search sellers, use cases…" oninput="filterList('fileSellers', this.value)"></div>
+        <div class="pane-body" id="fileSellers"></div>
+      </div>
+      <div class="pane" data-g="sellers" data-t="demo">
+        <div class="controls">
+          <input type="text" id="sellerId" placeholder="Any seller id from the PS07 file" onkeydown="if(event.key==='Enter')pickCustom()">
+          <button class="sec" onclick="pickCustom()">Load</button>
+        </div>
+        <div class="search"><input type="text" id="qDemo" placeholder="Filter samples…" oninput="filterList('sellers', this.value)"></div>
+        <div class="pane-body" id="sellers"></div>
       </div>
     </div>
-    <div class="card">
-      <h2>Live personas (chosen during the call)</h2>
+    <details class="card fold">
+      <summary>How it works · personas · languages</summary>
+      <div class="reason" style="margin-bottom:10px">Saaras STT → turn-taking → Behaviour Analyst + live profile → Persona Director → call flow → Sarvam LLM → Bulbul (streamed)</div>
       <div class="pcat" id="pcat"></div>
-    </div>
-    <div class="card">
-      <h2>Languages</h2>
-      <div class="reason" id="langs"></div>
-    </div>
+      <div class="reason" id="langs" style="margin-top:10px"></div>
+    </details>
   </section>
 
+  <!-- 2 · call -->
   <section class="col">
-    <div class="card" style="display:flex; flex-direction:column; flex:1; min-height:0">
-      <h2>2 · Live call</h2>
-      <div class="controls" style="margin-bottom:6px">
-        <label class="reason">use case <select id="mode" onchange="modeChanged()">
-          <option value="auto">Auto (from the seller file)</option>
-          <option value="buyer">Buyer help desk (a buyer calls in)</option></select></label>
-        <input type="text" id="product" placeholder="product the buyer asks about (optional)" style="display:none">
+    <div class="card grow" id="callCard">
+      <div class="card-h"><h2>2 · Live call</h2><span id="status">idle</span></div>
+      <div class="who" id="who"></div>
+      <div class="setup">
+        <label class="field"><span>Use case</span>
+          <select id="mode" onchange="modeChanged()">
+            <option value="auto">Auto (from the seller file)</option>
+            <option value="buyer">Buyer help desk (a buyer calls in)</option>
+          </select></label>
+        <label class="field"><span>Start as</span>
+          <select id="startPersona"><option value="">Auto (from the data)</option></select></label>
+        <label class="field" id="productField" style="display:none"><span>Product the buyer asks about</span>
+          <input type="text" id="product" placeholder="optional"></label>
       </div>
-      <div class="controls">
-        <label class="reason">start as <select id="startPersona"><option value="">Auto (from the data)</option></select></label>
+      <div class="actions">
         <button id="startBtn" onclick="startCall()" disabled>Start call</button>
         <button id="endBtn" class="sec" onclick="endCall()" disabled>End call</button>
-        <label><input type="checkbox" id="handsfree" checked> hands-free</label>
-        <label class="reason" title="Speak over the agent to cut it off. Use headphones, or its own voice may trigger this."><input type="checkbox" id="bargein"> let me interrupt (headphones)</label>
         <button id="pttBtn" class="sec" disabled>Hold to talk</button>
-        <div class="meter"><div id="level"></div></div>
-        <span id="status">idle</span>
+        <div class="live"><div class="meter" title="microphone level"><div id="level"></div></div></div>
       </div>
-      <div id="chat" class="scroll" style="margin-top:8px"></div>
-      <div class="controls">
-        <input type="text" id="typed" placeholder="Type a seller line (fallback if no mic)…" onkeydown="if(event.key==='Enter')sendTyped()">
-        <button class="sec" onclick="sendTyped()">Send</button>
+      <div class="toggles">
+        <label><input type="checkbox" id="handsfree" checked> Hands-free (auto-detect when I speak)</label>
+        <label title="Speak over the agent to cut it off. Use headphones, or its own voice may trigger this."><input type="checkbox" id="bargein"> Let me interrupt (headphones)</label>
+      </div>
+      <div id="chat">
+        <div class="empty"><div><b>No call yet</b>Pick a seller, check the use case, then press <i>Start call</i>.<br>Speak into the mic, or type seller lines below.</div></div>
+      </div>
+      <div class="composer">
+        <input type="text" id="typed" placeholder="Start a call to type seller lines here" disabled onkeydown="if(event.key==='Enter')sendTyped()">
+        <button class="sec" id="sendBtn" onclick="sendTyped()" disabled>Send</button>
       </div>
     </div>
   </section>
 
+  <!-- 3 · insights -->
   <section class="col">
-    <div class="card">
-      <h2>3 · Active persona (decided live)</h2>
-      <div class="badge" id="badge"><div class="nm">—</div><div class="ds">Start a call</div></div>
+    <div class="card" id="personaCard">
+      <div class="card-h"><h2>3 · Active persona</h2><span class="reason">decided live</span></div>
+      <div class="badge" id="badge"><div class="nm">—</div><div class="ds">Start a call to see the persona</div></div>
       <div class="tl" id="timeline"></div>
-      <div style="margin-top:8px"><b>Behaviour Analyst</b> <span class="reason">(reads the transcript after every seller turn)</span></div>
-      <div id="analyst" class="reason">waiting for the seller…</div>
-      <details style="margin-top:6px"><summary>delivery settings now</summary><div class="kv" id="settings"></div></details>
+      <div class="sublabel">Behaviour Analyst</div>
+      <div id="analyst" class="reason">Reads the transcript after every seller turn. Waiting for the seller…</div>
       <div class="reason" id="timings" style="margin-top:6px"></div>
     </div>
-    <div class="card">
-      <h2>Live caller persona (generated from the conversation)</h2>
-      <div id="profile" class="reason">Builds up from the caller's words, language and speaking speed after every turn.</div>
-    </div>
-    <div class="card">
-      <h2>Call flow <span class="reason" id="flowLabel"></span></h2>
-      <div id="flow" class="reason">The agent moves through these stages as the conversation allows, not in a fixed script.</div>
-    </div>
-    <div class="card scroll" style="flex:1">
-      <h2>Switch log <button class="sec" style="float:right;padding:3px 8px;font-size:11px" onclick="downloadLog()">download</button></h2>
-      <table><thead><tr><th>#</th><th>Switch</th><th>Seller state · evidence</th><th>Reason · change</th></tr></thead><tbody id="log"></tbody></table>
-    </div>
-    <div class="card scroll" style="max-height:34vh">
-      <details id="specBox"><summary>Persona spec with reasons</summary><div id="spec"></div></details>
+    <div class="card grow" id="insights">
+      <div class="tabs" data-g="ins">
+        <button data-t="flow" class="on" onclick="tab('ins','flow')">Flow</button>
+        <button data-t="caller" onclick="tab('ins','caller')">Caller</button>
+        <button data-t="voice" onclick="tab('ins','voice')">Voice</button>
+        <button data-t="log" onclick="tab('ins','log')">Switches <span class="n" id="nLog">0</span></button>
+        <button data-t="spec" onclick="tab('ins','spec')">Spec</button>
+      </div>
+      <div class="pane on" data-g="ins" data-t="flow"><div class="pane-body">
+        <div class="sublabel" id="flowLabel" style="margin-top:0">Call flow</div>
+        <div id="flow" class="reason">The agent moves through these stages as the conversation allows, not in a fixed script.</div>
+      </div></div>
+      <div class="pane" data-g="ins" data-t="caller"><div class="pane-body">
+        <div class="sublabel" style="margin-top:0">Live caller persona</div>
+        <div id="profile" class="reason">Builds up from the caller's words, language and speaking speed after every turn.</div>
+      </div></div>
+      <div class="pane" data-g="ins" data-t="voice"><div class="pane-body">
+        <div class="sublabel" style="margin-top:0">Delivery settings now</div>
+        <div class="kv" id="settings"><div class="reason" style="grid-column:1/-1">Shown once the call starts. Changed values turn amber.</div></div>
+      </div></div>
+      <div class="pane" data-g="ins" data-t="log"><div class="pane-body">
+        <div class="card-h"><div class="sublabel" style="margin:0">Persona switch log</div><button class="sec sm" onclick="downloadLog()">Download JSON</button></div>
+        <table><thead><tr><th>#</th><th>Switch</th><th>Seller state · evidence</th><th>Reason · change</th></tr></thead><tbody id="log"></tbody></table>
+      </div></div>
+      <div class="pane" data-g="ins" data-t="spec"><div class="pane-body">
+        <div class="sublabel" style="margin-top:0">Persona spec with reasons</div>
+        <div id="spec" class="reason">Pick a seller to see the persona built from their data.</div>
+      </div></div>
     </div>
   </section>
 </main>
 
 <script>
 let SELLER = null, SESSION = null, BASE = null, CUR = null, busy = false, ended = false, PERSONAS = {}, LANGS = {}, PREV_PROFILE = null;
+let CARDS = {};
 let audioCtx, micStream, proc, speaking = false, vadOn = false, chunks = [], noise = 0.008, silentMs = 0, voicedMs = 0;
 let PENDING = false, idleMs = 0, PLAYER = null, CUR_AUDIO = null, INTERRUPTED = false, loudMs = 0;
 const SR_OUT = 16000;
@@ -184,39 +334,88 @@ async function api(path, opts) {
   if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
   return j;
 }
-function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function status(t, cls) { const s = document.getElementById('status'); s.textContent = t; s.className = cls || ''; }
+function setComposer(on) {
+  const t = document.getElementById('typed');
+  t.disabled = !on; document.getElementById('sendBtn').disabled = !on;
+  t.placeholder = on ? 'Type what the seller says (if you have no mic) and press Enter' : 'Start a call to type seller lines here';
+}
 
+function tab(g, id) {
+  document.querySelectorAll(`.tabs[data-g="${g}"] button`).forEach(b => b.classList.toggle('on', b.dataset.t === id));
+  document.querySelectorAll(`.pane[data-g="${g}"]`).forEach(p => p.classList.toggle('on', p.dataset.t === id));
+}
+function setStep(n) {
+  document.querySelectorAll('#steps .st').forEach((e, i) => { e.classList.toggle('on', i === n - 1); e.classList.toggle('done', i < n - 1); });
+}
+function filterList(id, q) {
+  q = q.trim().toLowerCase();
+  document.querySelectorAll('#' + id + ' .seller').forEach(e => { e.style.display = !q || e.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+}
+
+function sellerName(s, key) {
+  const id = key.replace(/^f:/, '');
+  if (!s) return id;
+  if (s.use_case) return s.use_case.who || id;
+  return s.seller_type ? s.seller_type.replace(/_/g, ' ') : id;
+}
 function sellerCard(s) {
-  if (s.dnc) return `<div class="seller" style="opacity:.6"><b>${esc(s.key.replace(/^f:/, ''))}</b> <span class="tag">do not call</span><div class="reason">${esc(s.summary)}</div></div>`;
-  const uc = s.use_case;
-  const head = uc ? `<b>${esc(uc.who || s.key.replace(/^f:/, ''))}</b><br><span class="tag moderate">${esc(uc.name)}</span> <span class="tag">${esc(uc.archetype)}</span>`
-                  : `<b>${esc(s.seller_type.replace(/_/g,' '))}</b> <span class="tag">${esc(s.confidence)}</span>`;
-  return `<div class="seller" data-k="${esc(s.key)}" onclick="pick('${esc(s.key)}')">${head}
-      ${uc && uc.requirement ? `<div class="reason"><b>Needs:</b> ${esc(uc.requirement)}</div>` : ''}
-      ${uc ? `<div class="reason"><i>${esc(uc.reason)}</i></div>` : `<div class="reason">${esc(s.summary)}</div>`}
-      <div class="reason">starts as <b>${esc(s.start_persona)}</b> — ${esc(s.start_reason)}</div>
-      <div class="chips">${Object.entries(s.settings).map(([k,v]) => `<span class="chip">${k}: ${esc(v)}</span>`).join('')}</div></div>`;
+  CARDS[s.key] = s;
+  if (s.dnc) return `<div class="seller off"><div class="top"><span class="nm">${esc(s.key.replace(/^f:/, ''))}</span><span class="tag">do not call</span></div><div class="reason clamp">${esc(s.summary)}</div></div>`;
+  const uc = s.use_case, name = sellerName(s, s.key);
+  const tags = uc ? `<span class="tag moderate">${esc(uc.name)}</span> <span class="tag">${esc(uc.archetype)}</span>` : `<span class="tag">confidence: ${esc(s.confidence)}</span>`;
+  const line = uc ? (uc.requirement ? `<b>Needs:</b> ${esc(uc.requirement)}` : esc(uc.reason)) : esc(s.summary);
+  return `<div class="seller" data-k="${esc(s.key)}" onclick="pick('${esc(s.key)}')">
+      <div class="top"><span class="nm" title="${esc(name)}">${esc(name)}</span></div>
+      <div class="tagrow">${tags}</div>
+      <div class="reason clamp">${line}</div>
+      <div class="starts">starts as <b>${esc(s.start_persona)}</b></div>
+      <div class="more">
+        ${uc ? `<div class="reason"><i>${esc(uc.reason)}</i></div>` : ''}
+        <div class="reason">${esc(s.start_reason)}</div>
+        <div class="chips">${Object.entries(s.settings).map(([k,v]) => `<span class="chip">${k}: ${esc(v)}</span>`).join('')}</div>
+      </div></div>`;
+}
+function renderWho() {
+  const el = document.getElementById('who');
+  if (document.getElementById('mode').value === 'buyer') {
+    el.innerHTML = `<div class="av">B</div><div style="min-width:0"><b>Buyer help desk</b><div class="reason clamp1">A buyer calls in; the agent helps them find the right product.</div></div>`;
+    return;
+  }
+  if (!SELLER) {
+    el.innerHTML = `<div class="av">?</div><div style="min-width:0"><b>No seller selected</b><div class="reason clamp1">Pick one from the list to build their persona.</div></div>`;
+    return;
+  }
+  const s = CARDS[SELLER], uc = s && s.use_case, name = sellerName(s, SELLER);
+  const sub = s ? (uc ? `${uc.name} · ${uc.archetype} · starts as ${s.start_persona}` : `${s.summary}`) : 'Seller id from the PS07 file';
+  el.innerHTML = `<div class="av">${esc((name.trim()[0] || '?').toUpperCase())}</div><div style="min-width:0"><b>${esc(name)}</b><div class="reason clamp1" title="${esc(sub)}">${esc(sub)}</div></div>`;
 }
 function renderFile(f) {
-  document.getElementById('fileName').textContent = f.name ? `${f.name} · ${f.sellers.length} sellers` : 'No file loaded';
-  document.getElementById('fileSellers').innerHTML = f.sellers.map(sellerCard).join('');
+  document.getElementById('fileName').textContent = f.name ? `${f.name} · ${f.sellers.length} sellers` : 'CSV, JSON or XLSX · one row per seller';
+  document.getElementById('nFile').textContent = f.sellers.length;
+  document.getElementById('fileSellers').innerHTML = f.sellers.length ? f.sellers.map(sellerCard).join('')
+    : '<div class="empty-list">No seller file yet. Upload one, or press <b>Load sample</b>.</div>';
+  document.querySelectorAll('.seller').forEach(e => e.classList.toggle('sel', e.dataset.k === SELLER));
+  filterList('fileSellers', document.getElementById('qFile').value);
 }
 async function uploadFile(file) {
   if (!file) return;
   status('reading seller file…', 'thinking');
   try {
     const f = await api('/api/upload?name=' + encodeURIComponent(file.name), {method: 'POST', body: await file.arrayBuffer()});
-    renderFile(f); status('idle');
+    renderFile(f); tab('sellers', 'file'); status('idle');
   } catch (e) { status(e.message); }
 }
 async function loadSample() {
-  try { renderFile(await api('/api/upload?sample=1', {method: 'POST'})); } catch (e) { status(e.message); }
+  try { renderFile(await api('/api/upload?sample=1', {method: 'POST'})); tab('sellers', 'file'); } catch (e) { status(e.message); }
 }
 async function loadSellers() {
   const j = await api('/api/sellers');
   document.getElementById('sellers').innerHTML = j.sellers.map(sellerCard).join('');
+  document.getElementById('nDemo').textContent = j.sellers.length;
   renderFile(j.file);
+  if (!j.file.sellers.length) tab('sellers', 'demo');
   document.getElementById('mode').insertAdjacentHTML('beforeend',
     j.use_cases.map(u => `<option value="${u.id}" title="${esc(u.goal)}">${esc(u.name)}</option>`).join(''));
   if (j.credits) showCredits(j.credits);
@@ -226,12 +425,14 @@ async function loadSellers() {
   document.getElementById('pcat').innerHTML = j.personas.map(p => `<i style="background:${p.colour}"></i><div title="${esc(p.description)}"><b>${esc(p.name)}</b> <span class="tag">seller ${esc(p.state)}</span></div>`).join('');
   document.getElementById('langs').innerHTML = '<b>Spoken + understood:</b> ' + Object.values(j.languages.speak_and_understand).join(', ') +
     '<br><b>Understood (reply in Hindi/English):</b> ' + Object.values(j.languages.understand_only).join(', ');
+  renderWho();
 }
 function modeChanged() {
   const buyer = document.getElementById('mode').value === 'buyer';
-  document.getElementById('product').style.display = buyer ? '' : 'none';
+  document.getElementById('productField').style.display = buyer ? '' : 'none';
   if (buyer) document.getElementById('startBtn').disabled = false;
   else document.getElementById('startBtn').disabled = !SELLER;
+  renderWho();
   if (SELLER && !buyer) pick(SELLER);
 }
 function useCaseParam() {
@@ -240,24 +441,27 @@ function useCaseParam() {
 }
 function renderFlow(f) {
   if (!f) return;
-  document.getElementById('flowLabel').textContent = '· ' + f.label;
+  document.getElementById('flowLabel').textContent = 'Call flow · ' + f.label;
   const visited = new Set(f.visited || []);
   const stages = f.stages.map((s, i) => `${i ? '<span>›</span>' : ''}<span class="stage ${s.id === f.stage ? 'now' : visited.has(s.id) ? 'done' : ''}">${esc(s.name)}</span>`).join('');
   const notes = Object.entries(f.notes || {});
   const ck = (f.checklist || []);
-  const checklist = ck.length ? `<div style="margin-top:8px"><b>Checklist</b> ${f.progress ? `${f.progress.done}/${f.progress.total}` : ''}
-      <div class="bar"><div style="width:${f.progress ? 100 * f.progress.done / f.progress.total : 0}%;background:#12866b"></div></div>
-      <div class="chips">${ck.map(c => `<span class="chip" style="${(f.notes || {})[c.key] ? 'background:#ecfdf3;color:#067647' : ''}">${(f.notes || {})[c.key] ? '✓ ' : ''}${esc(c.label)}</span>`).join('')}</div></div>` : '';
-  document.getElementById('flow').innerHTML = (f.goal ? `<div class="reason" style="margin-bottom:6px">${f.archetype ? '<b>' + esc(f.archetype) + '</b> · ' : ''}${esc(f.goal)}</div>` : '') +
+  const checklist = ck.length ? `<div class="sublabel">Checklist ${f.progress ? `· ${f.progress.done}/${f.progress.total}` : ''}</div>
+      <div class="bar"><div style="width:${f.progress ? 100 * f.progress.done / f.progress.total : 0}%"></div></div>
+      <div class="chips">${ck.map(c => `<span class="chip ${(f.notes || {})[c.key] ? 'done' : ''}">${(f.notes || {})[c.key] ? '✓ ' : ''}${esc(c.label)}</span>`).join('')}</div>` : '';
+  document.getElementById('flow').innerHTML = (f.goal ? `<div class="reason" style="margin-bottom:8px">${f.archetype ? '<b>' + esc(f.archetype) + '</b> · ' : ''}${esc(f.goal)}</div>` : '') +
     `<div class="stages">${stages}</div>` + checklist +
-    (notes.length ? `<div class="kv" style="margin-top:8px">${notes.map(([k, v]) => `<div class="k">${esc(k.replace(/_/g, ' '))}</div><div class="v">${esc(v)}</div>`).join('')}</div>`
-                  : `<div class="reason" style="margin-top:6px">Nothing captured yet.</div>`);
+    `<div class="sublabel">Captured so far</div>` +
+    (notes.length ? `<div class="kv">${notes.map(([k, v]) => `<div class="k">${esc(k.replace(/_/g, ' '))}</div><div class="v">${esc(v)}</div>`).join('')}</div>`
+                  : `<div class="reason">Nothing captured yet.</div>`);
 }
 async function pick(k) {
   SELLER = k;
   document.querySelectorAll('.seller').forEach(e => e.classList.toggle('sel', e.dataset.k === k));
+  renderWho();
   const spec = await api('/api/spec?seller=' + encodeURIComponent(k) + useCaseParam());
   renderSpec(spec);
+  if (!SESSION || ended) { tab('ins', 'spec'); setStep(2); }
   document.getElementById('startBtn').disabled = false;
 }
 async function pickCustom() { const id = document.getElementById('sellerId').value.trim(); if (id) { status('loading seller file…','thinking'); try { await pick(id); status('idle'); } catch(e) { status(e.message); } } }
@@ -284,7 +488,6 @@ function renderSpec(spec) {
   h += '<p><b>Escalation</b></p><ul>' + p.escalation_rules.map(x => `<li>${esc(x.when)} → ${esc(x.do)}</li>`).join('') + '</ul>';
   h += '<p><b>Guardrails</b></p><ul>' + (Array.isArray(p.guardrails) ? p.guardrails : []).map(x => `<li>${esc(x)}</li>`).join('') + '</ul>';
   document.getElementById('spec').innerHTML = h;
-  document.getElementById('specBox').open = true;
 }
 function renderSettings(s, changedKeys) {
   CUR = s;
@@ -306,18 +509,19 @@ function addSwitches(list) {
   const c = document.getElementById('chat'), log = document.getElementById('log');
   for (const e of list) {
     const ch = Object.entries(e.change).filter(([k]) => k !== 'focus').map(([k, v]) => `${k}: ${v[0]} → ${v[1]}`).join(', ') || '—';
-    const what = e.type === 'persona' ? `<b style="color:${pcol(e.from_persona)}">${esc(e.from_name)}</b> → <b style="color:${pcol(e.to_persona)}">${esc(e.to_name)}</b>`
+    const what = e.type === 'persona' ? `<span class="pill" style="background:${pcol(e.from_persona)}">${esc(e.from_name)}</span> → <span class="pill" style="background:${pcol(e.to_persona)}">${esc(e.to_name)}</span>`
                : e.type === 'language' ? `<b>language</b> ${esc(LANGS[(e.change.language || [])[0]] || (e.change.language || [])[0] || '')} → ${esc(LANGS[(e.change.language || [])[1]] || (e.change.language || [])[1] || 'Hindi (no voice)')}`
                : e.type === 'profile' ? `<b>live profile</b>`
                : `<b>escalation</b>`;
     c.insertAdjacentHTML('beforeend', `<div class="sw">⚡ ${what}<br><span class="reason">${esc(e.reason)}</span></div>`);
     log.insertAdjacentHTML('beforeend', `<tr><td>${e.seller_turn}</td><td>${what}</td><td><b>${esc(e.signal)}</b> ${e.score != null ? esc(e.score) : ''} ${e.trend ? esc(e.trend) : ''}<br><span class="reason">${esc(e.detector)} · “${esc(e.evidence)}”</span></td><td class="reason">${esc(e.reason)}<br><i>${esc(ch)}</i></td></tr>`);
   }
+  document.getElementById('nLog').textContent = log.rows.length;
   c.scrollTop = c.scrollHeight;
 }
 function renderPersona(p, timeline, flash) {
   const b = document.getElementById('badge');
-  b.style.background = p.colour;
+  b.style.background = p.colour; b.style.borderColor = 'transparent';
   b.innerHTML = `<div class="nm">${esc(p.name)}</div><div class="ds">${esc(p.description)}</div>`;
   if (flash) { b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); }
   if (timeline) document.getElementById('timeline').innerHTML = timeline.map((t, i) =>
@@ -328,7 +532,7 @@ function renderAnalyst(a, d) {
   const p = Object.values(PERSONAS).find(x => x.state === a.state);
   const col = p ? p.colour : '#667085';
   document.getElementById('analyst').innerHTML =
-    `seller is <b style="color:${col}">${esc(a.state)}</b> · intensity ${a.intensity.toFixed(2)} · ${esc(a.trend)} · <i>${esc(a.source)}</i>
+    `seller is <span class="pill" style="background:${col}">${esc(a.state)}</span> · intensity ${a.intensity.toFixed(2)} · ${esc(a.trend)} · <i>${esc(a.source)}</i>
      <div class="bar"><div style="width:${a.intensity * 100}%;background:${col}"></div></div>
      ${a.evidence ? '“' + esc(a.evidence) + '” — ' : ''}${esc(a.rationale)}<br><b>Director:</b> ${esc(d ? d.action : '')} — ${esc(d ? d.reason : '')}`;
 }
@@ -417,7 +621,7 @@ async function streamApi(path, opts) {
 function showCredits(c) {
   const el = document.getElementById('credits');
   el.textContent = `Sarvam credits used (estimate): ${c.spent_estimate} / ${c.limit} · ${c.remaining} left`;
-  el.style.color = c.remaining < 0.15 * c.limit ? '#b42318' : '';
+  el.style.color = c.remaining < 0.15 * c.limit ? 'var(--bad)' : '';
 }
 function timingText(t) { if (!t) return ''; return Object.entries(t).filter(([k]) => k.endsWith('_ms')).map(([k, v]) => `${k.replace('_ms','')} ${v} ms`).join(' · '); }
 
@@ -457,9 +661,10 @@ function handle(r) {
 async function startCall() {
   const mode = document.getElementById('mode').value;
   if (!SELLER && mode !== 'buyer') return;
-  document.getElementById('chat').innerHTML = ''; document.getElementById('log').innerHTML = '';
+  document.getElementById('chat').innerHTML = ''; document.getElementById('log').innerHTML = ''; document.getElementById('nLog').textContent = '0';
   ended = false; busy = true; PREV_PROFILE = null; PENDING = false; INTERRUPTED = false; status('calling…', 'thinking');
   document.getElementById('analyst').textContent = 'waiting for the caller…';
+  setStep(3); tab('ins', 'flow');
   try {
     await ensureMic();
     document.getElementById('endBtn').disabled = false; document.getElementById('pttBtn').disabled = false;
@@ -469,11 +674,11 @@ async function startCall() {
                                             body: JSON.stringify({seller: SELLER || 'unknown', persona, mode, product, stream: true})});
     document.getElementById('analyst').textContent = 'Starting persona: ' + (r.start_reason || '');
   } catch (e) { status(e.message); busy = false; return; }
-  busy = false; listen();
+  busy = false; setComposer(true); listen();
 }
-function endCall() { ended = true; vadOn = false; if (PLAYER) PLAYER.stop(); status('call ended'); document.getElementById('endBtn').disabled = true; }
+function endCall() { ended = true; vadOn = false; if (PLAYER) PLAYER.stop(); status('call ended'); document.getElementById('endBtn').disabled = true; setComposer(false); }
 function listen(keepIdle) {
-  if (ended) { status('call ended'); vadOn = false; return; }
+  if (ended) { status('call ended'); vadOn = false; setComposer(false); return; }
   chunks = []; silentMs = 0; voicedMs = 0; loudMs = 0;
   if (!keepIdle) idleMs = 0;
   vadOn = document.getElementById('handsfree').checked;
